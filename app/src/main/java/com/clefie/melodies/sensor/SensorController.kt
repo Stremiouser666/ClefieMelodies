@@ -1,5 +1,10 @@
 package com.clefie.melodies.sensor
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -7,8 +12,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.abs
+import kotlin.math.sqrt
 
-class SensorController {
+class SensorController(private val context: Context) {
 
     private val _amplitude = MutableStateFlow(0f)
     val amplitude: StateFlow<Float> = _amplitude
@@ -16,15 +22,21 @@ class SensorController {
     private val _acceleration = MutableStateFlow(0f)
     val acceleration: StateFlow<Float> = _acceleration
 
-    private var job: Job? = null
+    private var micJob: Job? = null
+    private var sensorManager: SensorManager? = null
+
+    // smoothing
+    private var lastAccel = 0f
+    private val alpha = 0.1f   // smoothing factor
+    private val deadzone = 0.02f
 
     fun start() {
         startMic()
-        startFakeAccel() // replace later with real sensor
+        startAccelerometer()
     }
 
     private fun startMic() {
-        job = CoroutineScope(Dispatchers.Default).launch {
+        micJob = CoroutineScope(Dispatchers.Default).launch {
             val bufferSize = AudioRecord.getMinBufferSize(
                 44100,
                 AudioFormat.CHANNEL_IN_MONO,
@@ -53,16 +65,38 @@ class SensorController {
         }
     }
 
-    private fun startFakeAccel() {
-        CoroutineScope(Dispatchers.Default).launch {
-            while (true) {
-                _acceleration.value = (0..10).random() / 10f
-                delay(200)
+    private fun startAccelerometer() {
+        sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val accel = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        sensorManager?.registerListener(object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+
+                val x = event.values[0]
+                val y = event.values[1]
+                val z = event.values[2]
+
+                val magnitude = sqrt(x * x + y * y + z * z)
+
+                // remove gravity (~9.8)
+                val motion = abs(magnitude - 9.8f) / 9.8f
+
+                // smoothing (low-pass filter)
+                val smoothed = lastAccel + alpha * (motion - lastAccel)
+                lastAccel = smoothed
+
+                // deadzone (ignore tiny movement)
+                val finalValue = if (smoothed < deadzone) 0f else smoothed
+
+                _acceleration.value = finalValue
             }
-        }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }, accel, SensorManager.SENSOR_DELAY_GAME)
     }
 
     fun stop() {
-        job?.cancel()
+        micJob?.cancel()
+        sensorManager?.unregisterListener(null)
     }
 }

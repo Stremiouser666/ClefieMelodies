@@ -1,6 +1,7 @@
 package com.clefie.melodies.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.clefie.melodies.engine.SequencerEngine
 import com.clefie.melodies.sensor.SensorController
@@ -8,10 +9,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class MainViewModel : ViewModel() {
+class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val sequencer = SequencerEngine()
-    private val sensors = SensorController()
+    private val sensors = SensorController(application)
 
     private val _bpm = MutableStateFlow(120f)
     val bpm: StateFlow<Float> = _bpm
@@ -49,7 +50,7 @@ class MainViewModel : ViewModel() {
     }
 
     private fun updateBpm() {
-        val newBpm = 80f + (_amplitude.value * 80f) + (_accel.value * 40f)
+        val newBpm = 80f + (_amplitude.value * 80f) + (_accel.value * 60f)
         _bpm.value = newBpm
         sequencer.setBpm(newBpm)
     }
