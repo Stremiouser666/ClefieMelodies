@@ -5,98 +5,78 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-class SensorController(private val context: Context) {
+class SensorController(
+    private val context: Context,
+    private val onMotion: (Float) -> Unit
+) : SensorEventListener {
 
-    private val _amplitude = MutableStateFlow(0f)
-    val amplitude: StateFlow<Float> = _amplitude
+    private val sensorManager =
+        context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
-    private val _acceleration = MutableStateFlow(0f)
-    val acceleration: StateFlow<Float> = _acceleration
+    private var accelerometer: Sensor? = null
 
-    private var micJob: Job? = null
-    private var sensorManager: SensorManager? = null
+    // Filtering + smoothing
+    private var gravity = FloatArray(3)
+    private var linearAcceleration = FloatArray(3)
 
-    // smoothing
-    private var lastAccel = 0f
-    private val alpha = 0.1f   // smoothing factor
-    private val deadzone = 0.02f
+    private var lastOutput = 0f
+
+    // Tunables (feel free to tweak later)
+    private val alpha = 0.8f           // low-pass filter strength
+    private val motionThreshold = 0.5f // ignore tiny movements
+    private val damping = 0.85f        // smooth output decay
 
     fun start() {
-        startMic()
-        startAccelerometer()
-    }
-
-    private fun startMic() {
-        micJob = CoroutineScope(Dispatchers.Default).launch {
-            val bufferSize = AudioRecord.getMinBufferSize(
-                44100,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            )
-
-            val recorder = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                44100,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize
-            )
-
-            val buffer = ShortArray(bufferSize)
-            recorder.startRecording()
-
-            while (isActive) {
-                recorder.read(buffer, 0, buffer.size)
-                val amp = buffer.map { abs(it.toInt()) }.average().toFloat() / 32767f
-                _amplitude.value = amp
-            }
-
-            recorder.stop()
-            recorder.release()
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        accelerometer?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
     }
 
-    private fun startAccelerometer() {
-        sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        val accel = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
-        sensorManager?.registerListener(object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent) {
-
-                val x = event.values[0]
-                val y = event.values[1]
-                val z = event.values[2]
-
-                val magnitude = sqrt(x * x + y * y + z * z)
-
-                // remove gravity (~9.8)
-                val motion = abs(magnitude - 9.8f) / 9.8f
-
-                // smoothing (low-pass filter)
-                val smoothed = lastAccel + alpha * (motion - lastAccel)
-                lastAccel = smoothed
-
-                // deadzone (ignore tiny movement)
-                val finalValue = if (smoothed < deadzone) 0f else smoothed
-
-                _acceleration.value = finalValue
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-        }, accel, SensorManager.SENSOR_DELAY_GAME)
+    fun stop() {
+        // FIX: explicit cast removes ambiguity
+        sensorManager.unregisterListener(this as SensorEventListener)
     }
 
-    fun stop() {
-        micJob?.cancel()
-        sensorManager?.unregisterListener(null)
+    override fun onSensorChanged(event: SensorEvent) {
+        if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
+
+        // --- Low-pass filter to isolate gravity ---
+        gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
+        gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
+        gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
+
+        // --- Remove gravity to get linear acceleration ---
+        linearAcceleration[0] = event.values[0] - gravity[0]
+        linearAcceleration[1] = event.values[1] - gravity[1]
+        linearAcceleration[2] = event.values[2] - gravity[2]
+
+        // --- Magnitude of movement ---
+        val magnitude = sqrt(
+            (linearAcceleration[0] * linearAcceleration[0] +
+             linearAcceleration[1] * linearAcceleration[1] +
+             linearAcceleration[2] * linearAcceleration[2]).toDouble()
+        ).toFloat()
+
+        // --- Threshold to kill idle noise ---
+        val motion = if (magnitude > motionThreshold) magnitude else 0f
+
+        // --- Smooth output (prevents jitter/looping feeling) ---
+        val output = if (motion > lastOutput) {
+            motion
+        } else {
+            lastOutput * damping
+        }
+
+        lastOutput = output
+
+        onMotion(output)
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // no-op
     }
 }
