@@ -23,6 +23,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _accel = MutableStateFlow(0f)
     val accel: StateFlow<Float> = _accel
 
+    private val _gyro = MutableStateFlow(0f)
+    val gyro: StateFlow<Float> = _gyro
+
+    private val _proximity = MutableStateFlow(false)
+    val proximity: StateFlow<Boolean> = _proximity
+
     init {
         start()
     }
@@ -31,28 +37,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sensors.start()
 
         viewModelScope.launch {
-            sensors.amplitude.collect {
-                _amplitude.value = it
-                updateBpm()
-            }
+            sensors.amplitude.collect { _amplitude.value = it; updateBpm() }
         }
-
         viewModelScope.launch {
-            sensors.acceleration.collect {
-                _accel.value = it
-                updateBpm()
-            }
+            sensors.acceleration.collect { _accel.value = it; updateBpm() }
+        }
+        viewModelScope.launch {
+            sensors.gyro.collect { _gyro.value = it; updateBpm() }
+        }
+        viewModelScope.launch {
+            sensors.proximity.collect { _proximity.value = it }
         }
 
-        sequencer.start { step ->
-            // later: trigger notes here
-        }
+        sequencer.start { /* step → Phase 2 */ }
     }
 
     private fun updateBpm() {
-        val newBpm = 80f + (_amplitude.value * 80f) + (_accel.value * 60f)
-        _bpm.value = newBpm
-        sequencer.setBpm(newBpm)
+        val newBpm = 80f +
+            (_amplitude.value * 80f) +
+            (_accel.value   * 40f) +
+            (_gyro.value    * 20f)
+        _bpm.value = newBpm.coerceIn(40f, 240f)
+        sequencer.setBpm(_bpm.value)
     }
 
     override fun onCleared() {
