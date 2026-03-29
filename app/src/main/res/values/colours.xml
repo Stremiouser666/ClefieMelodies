@@ -1,0 +1,5 @@
+cat << 'EOF' > app/src/main/res/values/colors.xml
+<resources>
+    <color name="purple_500">#6200EE</color>
+</resources>
+EOF
