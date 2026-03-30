@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.atan2
 import kotlin.math.sqrt
 
 class SensorController(private val context: Context) : SensorEventListener {
@@ -26,6 +27,7 @@ class SensorController(private val context: Context) : SensorEventListener {
     private var gyroscopeSensor: Sensor? = null
     private var proximitySensor: Sensor? = null
 
+    // ── Exposed StateFlows ──────────────────────────────────────────────────
     private val _acceleration = MutableStateFlow(0f)
     val acceleration: StateFlow<Float> = _acceleration
 
@@ -38,18 +40,37 @@ class SensorController(private val context: Context) : SensorEventListener {
     private val _amplitude = MutableStateFlow(0f)
     val amplitude: StateFlow<Float> = _amplitude
 
+    // Phase 3 additions
+    private val _shake = MutableStateFlow(false)
+    val shake: StateFlow<Boolean> = _shake
+
+    private val _tiltX = MutableStateFlow(0f)   // roll  -180 to 180 degrees
+    val tiltX: StateFlow<Float> = _tiltX
+
+    private val _tiltY = MutableStateFlow(0f)   // pitch -90  to 90 degrees
+    val tiltY: StateFlow<Float> = _tiltY
+
+    // ── Accelerometer filter state ──────────────────────────────────────────
     private val accelGravity = FloatArray(3)
     private var accelLastOutput = 0f
     private val accelAlpha = 0.8f
     private val accelThreshold = 0.5f
     private val accelDamping = 0.85f
 
+    // ── Shake detection ─────────────────────────────────────────────────────
+    private var lastMagnitude = 0f
+    private val shakeThreshold = 12f     // m/s² delta to trigger shake
+    private var shakeResetJob: Job? = null
+    private val shakeScope = CoroutineScope(Dispatchers.Default)
+
+    // ── Gyroscope filter state ──────────────────────────────────────────────
     private val gyroFiltered = FloatArray(3)
     private var gyroLastOutput = 0f
     private val gyroAlpha = 0.7f
     private val gyroThreshold = 0.05f
     private val gyroDamping = 0.90f
 
+    // ── AudioRecord ─────────────────────────────────────────────────────────
     private var audioRecord: AudioRecord? = null
     private var micJob: Job? = null
     private val micScope = CoroutineScope(Dispatchers.IO)
@@ -72,7 +93,10 @@ class SensorController(private val context: Context) : SensorEventListener {
     fun stop() {
         sensorManager.unregisterListener(this as SensorEventListener)
         stopMic()
+        shakeResetJob?.cancel()
     }
+
+    // ── Sensors ─────────────────────────────────────────────────────────────
 
     private fun startSensors() {
         accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -89,6 +113,8 @@ class SensorController(private val context: Context) : SensorEventListener {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
     }
+
+    // ── Mic ─────────────────────────────────────────────────────────────────
 
     private fun startMic() {
         audioRecord = AudioRecord(
@@ -133,6 +159,8 @@ class SensorController(private val context: Context) : SensorEventListener {
         audioRecord = null
     }
 
+    // ── Sensor callbacks ────────────────────────────────────────────────────
+
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_ACCELEROMETER -> handleAccelerometer(event)
@@ -142,10 +170,12 @@ class SensorController(private val context: Context) : SensorEventListener {
     }
 
     private fun handleAccelerometer(event: SensorEvent) {
+        // Low-pass filter → gravity
         accelGravity[0] = accelAlpha * accelGravity[0] + (1 - accelAlpha) * event.values[0]
         accelGravity[1] = accelAlpha * accelGravity[1] + (1 - accelAlpha) * event.values[1]
         accelGravity[2] = accelAlpha * accelGravity[2] + (1 - accelAlpha) * event.values[2]
 
+        // Linear acceleration
         val lx = event.values[0] - accelGravity[0]
         val ly = event.values[1] - accelGravity[1]
         val lz = event.values[2] - accelGravity[2]
@@ -155,6 +185,36 @@ class SensorController(private val context: Context) : SensorEventListener {
         val output = if (motion > accelLastOutput) motion else accelLastOutput * accelDamping
         accelLastOutput = output
         _acceleration.value = output
+
+        // ── Shake detection ────────────────────────────────────────────────
+        val delta = magnitude - lastMagnitude
+        if (delta > shakeThreshold && !_shake.value) {
+            _shake.value = true
+            shakeResetJob?.cancel()
+            shakeResetJob = shakeScope.launch {
+                kotlinx.coroutines.delay(500L)
+                _shake.value = false
+            }
+        }
+        lastMagnitude = magnitude
+
+        // ── Tilt (from gravity vector) ─────────────────────────────────────
+        // Roll: rotation around Z axis
+        val roll  = Math.toDegrees(
+            atan2(accelGravity[1].toDouble(), accelGravity[2].toDouble())
+        ).toFloat()
+
+        // Pitch: rotation around X axis
+        val pitch = Math.toDegrees(
+            atan2(
+                (-accelGravity[0]).toDouble(),
+                sqrt((accelGravity[1] * accelGravity[1] +
+                      accelGravity[2] * accelGravity[2]).toDouble())
+            )
+        ).toFloat()
+
+        _tiltX.value = roll
+        _tiltY.value = pitch
     }
 
     private fun handleGyroscope(event: SensorEvent) {
