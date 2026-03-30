@@ -1,7 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Permissions -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.BODY_SENSORS" />
+
+    <!-- Sensor features (optional so app installs on all devices) -->
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.gyroscope"     android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.proximity"     android:required="false" />
 
     <application
         android:allowBackup="true"

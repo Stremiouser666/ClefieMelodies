@@ -12,18 +12,18 @@ import kotlinx.coroutines.launch
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val sequencer = SequencerEngine()
-    private val sensors = SensorController(application)
+    private val sensors   = SensorController(application)
 
-    private val _bpm = MutableStateFlow(120f)
+    private val _bpm       = MutableStateFlow(120f)
     val bpm: StateFlow<Float> = _bpm
 
     private val _amplitude = MutableStateFlow(0f)
     val amplitude: StateFlow<Float> = _amplitude
 
-    private val _accel = MutableStateFlow(0f)
+    private val _accel     = MutableStateFlow(0f)
     val accel: StateFlow<Float> = _accel
 
-    private val _gyro = MutableStateFlow(0f)
+    private val _gyro      = MutableStateFlow(0f)
     val gyro: StateFlow<Float> = _gyro
 
     private val _proximity = MutableStateFlow(false)
@@ -37,28 +37,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sensors.start()
 
         viewModelScope.launch {
-            sensors.amplitude.collect { _amplitude.value = it; updateBpm() }
-        }
-        viewModelScope.launch {
-            sensors.acceleration.collect { _accel.value = it; updateBpm() }
-        }
-        viewModelScope.launch {
-            sensors.gyro.collect { _gyro.value = it; updateBpm() }
-        }
-        viewModelScope.launch {
-            sensors.proximity.collect { _proximity.value = it }
+            sensors.amplitude.collect {
+                _amplitude.value = it
+                updateBpm()
+            }
         }
 
-        sequencer.start { /* step → Phase 2 */ }
+        viewModelScope.launch {
+            sensors.acceleration.collect {
+                _accel.value = it
+                updateBpm()
+            }
+        }
+
+        viewModelScope.launch {
+            sensors.gyroscope.collect {
+                _gyro.value = it
+            }
+        }
+
+        viewModelScope.launch {
+            sensors.proximity.collect {
+                _proximity.value = it
+            }
+        }
+
+        sequencer.start { step ->
+            // Phase 2: trigger notes here
+        }
     }
 
     private fun updateBpm() {
-        val newBpm = 80f +
-            (_amplitude.value * 80f) +
-            (_accel.value   * 40f) +
-            (_gyro.value    * 20f)
+        val newBpm = 80f + (_amplitude.value * 80f) + (_accel.value * 60f)
         _bpm.value = newBpm.coerceIn(40f, 240f)
-        sequencer.setBpm(_bpm.value)
+        sequencer.setBpm(newBpm)
     }
 
     override fun onCleared() {
