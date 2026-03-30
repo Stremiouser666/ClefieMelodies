@@ -29,42 +29,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _proximity = MutableStateFlow(false)
     val proximity: StateFlow<Boolean> = _proximity
 
-    init {
-        start()
-    }
+    init { start() }
 
     private fun start() {
         sensors.start()
 
         viewModelScope.launch {
-            sensors.amplitude.collect {
-                _amplitude.value = it
+            sensors.amplitude.collect { value ->
+                _amplitude.value = value
                 updateBpm()
             }
         }
-
         viewModelScope.launch {
-            sensors.acceleration.collect {
-                _accel.value = it
+            sensors.acceleration.collect { value ->
+                _accel.value = value
                 updateBpm()
             }
         }
-
         viewModelScope.launch {
-            sensors.gyroscope.collect {
-                _gyro.value = it
+            sensors.gyroscope.collect { value ->
+                _gyro.value = value
+            }
+        }
+        viewModelScope.launch {
+            sensors.proximity.collect { value ->
+                _proximity.value = value
             }
         }
 
-        viewModelScope.launch {
-            sensors.proximity.collect {
-                _proximity.value = it
-            }
-        }
-
-        sequencer.start { step ->
-            // Phase 2: trigger notes here
-        }
+        sequencer.start { /* Phase 2: trigger notes here */ }
     }
 
     private fun updateBpm() {

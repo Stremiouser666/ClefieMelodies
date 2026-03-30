@@ -26,34 +26,30 @@ class SensorController(private val context: Context) : SensorEventListener {
     private var gyroscopeSensor: Sensor? = null
     private var proximitySensor: Sensor? = null
 
-    // ── Exposed StateFlows ──────────────────────────────────────────────────
     private val _acceleration = MutableStateFlow(0f)
-    val acceleration: StateFlow = _acceleration
+    val acceleration: StateFlow<Float> = _acceleration
 
     private val _gyroscope = MutableStateFlow(0f)
-    val gyroscope: StateFlow = _gyroscope
+    val gyroscope: StateFlow<Float> = _gyroscope
 
     private val _proximity = MutableStateFlow(false)
-    val proximity: StateFlow = _proximity
+    val proximity: StateFlow<Boolean> = _proximity
 
     private val _amplitude = MutableStateFlow(0f)
-    val amplitude: StateFlow = _amplitude
+    val amplitude: StateFlow<Float> = _amplitude
 
-    // ── Accelerometer filter state ──────────────────────────────────────────
     private val accelGravity = FloatArray(3)
     private var accelLastOutput = 0f
     private val accelAlpha = 0.8f
     private val accelThreshold = 0.5f
     private val accelDamping = 0.85f
 
-    // ── Gyroscope filter state ──────────────────────────────────────────────
     private val gyroFiltered = FloatArray(3)
     private var gyroLastOutput = 0f
     private val gyroAlpha = 0.7f
     private val gyroThreshold = 0.05f
     private val gyroDamping = 0.90f
 
-    // ── AudioRecord ─────────────────────────────────────────────────────────
     private var audioRecord: AudioRecord? = null
     private var micJob: Job? = null
     private val micScope = CoroutineScope(Dispatchers.IO)
@@ -65,9 +61,8 @@ class SensorController(private val context: Context) : SensorEventListener {
         AudioFormat.ENCODING_PCM_16BIT
     ).coerceAtLeast(4096)
 
-    // Smooth mic output to avoid jitter
     private var micSmoothed = 0f
-    private val micSmoothing = 0.15f   // lower = smoother, higher = more reactive
+    private val micSmoothing = 0.15f
 
     fun start() {
         startSensors()
@@ -78,8 +73,6 @@ class SensorController(private val context: Context) : SensorEventListener {
         sensorManager.unregisterListener(this as SensorEventListener)
         stopMic()
     }
-
-    // ── Sensors ─────────────────────────────────────────────────────────────
 
     private fun startSensors() {
         accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -97,8 +90,6 @@ class SensorController(private val context: Context) : SensorEventListener {
         }
     }
 
-    // ── Mic ─────────────────────────────────────────────────────────────────
-
     private fun startMic() {
         audioRecord = AudioRecord(
             MediaRecorder.AudioSource.MIC,
@@ -109,7 +100,6 @@ class SensorController(private val context: Context) : SensorEventListener {
         )
 
         if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-            // Permission not granted yet or hardware unavailable — stay on stub
             audioRecord?.release()
             audioRecord = null
             return
@@ -119,25 +109,17 @@ class SensorController(private val context: Context) : SensorEventListener {
 
         micJob = micScope.launch {
             val buffer = ShortArray(bufferSize / 2)
-
             while (isActive) {
                 val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
-
                 if (read > 0) {
-                    // RMS of raw PCM samples
                     var sum = 0.0
                     for (i in 0 until read) {
                         val sample = buffer[i].toDouble()
                         sum += sample * sample
                     }
                     val rms = sqrt(sum / read)
-
-                    // Normalise: 16-bit max = 32768
                     val normalised = (rms / 32768.0).toFloat().coerceIn(0f, 1f)
-
-                    // Exponential smoothing to kill jitter
                     micSmoothed = micSmoothing * normalised + (1f - micSmoothing) * micSmoothed
-
                     _amplitude.value = micSmoothed
                 }
             }
@@ -150,8 +132,6 @@ class SensorController(private val context: Context) : SensorEventListener {
         audioRecord?.release()
         audioRecord = null
     }
-
-    // ── Sensor callbacks ────────────────────────────────────────────────────
 
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
