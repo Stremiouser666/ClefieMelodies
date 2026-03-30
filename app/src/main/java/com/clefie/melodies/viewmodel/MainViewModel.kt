@@ -12,9 +12,9 @@ import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val sequencer  = SequencerEngine()
-    private val sensors    = SensorController(application)
-    val gestures           = GestureController()   // public so MainScreen can forward events
+    private val sequencer = SequencerEngine()
+    private val sensors   = SensorController(application)
+    val gestures          = GestureController()
 
     // ── Sensor StateFlows ───────────────────────────────────────────────────
     private val _bpm       = MutableStateFlow(120f)
@@ -41,7 +41,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _tiltY     = MutableStateFlow(0f)
     val tiltY: StateFlow<Float> = _tiltY
 
-    // ── Gesture StateFlows (proxied from GestureController) ─────────────────
+    // ── Gesture StateFlows (proxied) ────────────────────────────────────────
     val pitch         get() = gestures.pitch
     val holdIntensity get() = gestures.holdIntensity
     val fingerCount   get() = gestures.fingerCount
@@ -80,12 +80,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             sensors.tiltY.collect { value -> _tiltY.value = value }
         }
+        viewModelScope.launch {
+            gestures.swipeVelocity.collect {
+                updateBpm()
+            }
+        }
 
         sequencer.start { /* Phase 4: trigger visual pulses here */ }
     }
 
     private fun updateBpm() {
-        val newBpm = 80f + (_amplitude.value * 80f) + (_accel.value * 60f)
+        // mic amplitude: base driver  (0–1 → 0–80 BPM)
+        // accelerometer: motion energy (0–1 → 0–60 BPM)
+        // swipe velocity: expressiveness (0–1 → 0–40 BPM)
+        val newBpm = 80f +
+            (_amplitude.value    * 80f) +
+            (_accel.value        * 60f) +
+            (gestures.swipeVelocity.value * 40f)
+
         _bpm.value = newBpm.coerceIn(40f, 240f)
         sequencer.setBpm(newBpm)
     }
