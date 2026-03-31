@@ -1,31 +1,32 @@
 package com.clefie.melodies.sensor
 
 import androidx.compose.ui.input.pointer.PointerEvent
-import androidx.compose.ui.input.pointer.PointerEventType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.math.sqrt
+import kotlin.math.sign
 
 class GestureController {
 
     // ── Exposed StateFlows ──────────────────────────────────────────────────
 
-    // Swipe X position normalised 0.0–1.0 → maps to pitch
-    private val _pitch = MutableStateFlow(0.5f)
+    // Vertical swipe direction: up = +1.0, down = -1.0, idle = 0.0
+    private val _pitch = MutableStateFlow(0f)
     val pitch: StateFlow<Float> = _pitch
 
-    // Hold duration normalised 0.0–1.0 → maps to intensity/energy boost
+    // Hold duration 0.0–1.0 → intensity/energy boost
     private val _holdIntensity = MutableStateFlow(0f)
     val holdIntensity: StateFlow<Float> = _holdIntensity
 
-    // Number of fingers currently down → maps to chord complexity
+    // Fingers currently down → chord complexity
     private val _fingerCount = MutableStateFlow(0)
     val fingerCount: StateFlow<Int> = _fingerCount
 
-    // Pressure 0.0–1.0 (falls back gracefully on devices with no pressure sensor)
+    // Pressure 0.0–1.0 (uses touch size as proxy on most devices)
     private val _pressure = MutableStateFlow(0f)
     val pressure: StateFlow<Float> = _pressure
 
-    // Swipe velocity magnitude → maps to expression/dynamics
+    // Signed swipe velocity: left = negative, right = positive (-1.0 to +1.0)
     private val _swipeVelocity = MutableStateFlow(0f)
     val swipeVelocity: StateFlow<Float> = _swipeVelocity
 
@@ -35,62 +36,79 @@ class GestureController {
     private var lastY = 0f
     private var lastEventTime = 0L
 
-    private val maxHoldMs = 3000L      // hold fully saturates at 3 seconds
-    private val maxVelocity = 3000f    // px/s considered max swipe speed
+    // Smoothing for velocity and pitch to prevent flicker
+    private var smoothedVelocityX = 0f
+    private var smoothedVelocityY = 0f
+    private val velocitySmoothing = 0.25f   // higher = more responsive
 
-    // ── Called from MainScreen pointerInput ─────────────────────────────────
+    private val maxHoldMs   = 3000L    // hold fully saturates at 3s
+    private val maxVelocity = 2000f    // px/s = max swipe speed reference
+
     fun onPointerEvent(event: PointerEvent, screenWidth: Float) {
         val pointers = event.changes.filter { it.pressed }
 
         _fingerCount.value = pointers.size
 
         if (pointers.isEmpty()) {
-            // All fingers lifted — decay hold intensity, reset velocity
             holdStartTime = 0L
-            _holdIntensity.value = 0f
+            // Decay smoothly to zero instead of snapping
+            smoothedVelocityX = 0f
+            smoothedVelocityY = 0f
             _swipeVelocity.value = 0f
-            _pressure.value = 0f
+            _pitch.value        = 0f
+            _pressure.value     = 0f
             return
         }
 
         val primary = pointers.first()
-        val now = System.currentTimeMillis()
-
-        // ── Pitch from X position ──────────────────────────────────────────
-        val x = primary.position.x
-        if (screenWidth > 0f) {
-            _pitch.value = (x / screenWidth).coerceIn(0f, 1f)
-        }
+        val now     = System.currentTimeMillis()
+        val x       = primary.position.x
+        val y       = primary.position.y
 
         // ── Hold intensity ─────────────────────────────────────────────────
-        if (holdStartTime == 0L) {
-            holdStartTime = now
-        }
+        if (holdStartTime == 0L) holdStartTime = now
         val heldMs = (now - holdStartTime).coerceAtLeast(0L)
         _holdIntensity.value = (heldMs.toFloat() / maxHoldMs).coerceIn(0f, 1f)
 
-        // ── Swipe velocity ─────────────────────────────────────────────────
+        // ── Velocity (signed) ──────────────────────────────────────────────
         if (lastEventTime > 0L) {
             val dt = (now - lastEventTime).coerceAtLeast(1L).toFloat()
+
             val dx = x - lastX
-            val dy = primary.position.y - lastY
-            val dist = kotlin.math.sqrt(dx * dx + dy * dy)
-            val velocityPxPerSec = dist / dt * 1000f
-            _swipeVelocity.value = (velocityPxPerSec / maxVelocity).coerceIn(0f, 1f)
+            val dy = y - lastY
+
+            // px/s normalised to -1..+1
+            val rawVx = (dx / dt * 1000f) / maxVelocity
+            val rawVy = (dy / dt * 1000f) / maxVelocity
+
+            // Exponential smoothing
+            smoothedVelocityX = velocitySmoothing * rawVx + (1f - velocitySmoothing) * smoothedVelocityX
+            smoothedVelocityY = velocitySmoothing * rawVy + (1f - velocitySmoothing) * smoothedVelocityY
+
+            // Horizontal: left = negative, right = positive
+            _swipeVelocity.value = smoothedVelocityX.coerceIn(-1f, 1f)
+
+            // Vertical: up = positive (dy negative), down = negative (dy positive)
+            _pitch.value = (-smoothedVelocityY).coerceIn(-1f, 1f)
         }
 
-        // ── Pressure (graceful fallback) ───────────────────────────────────
-        // Most devices return 1.0 constantly — we detect that and normalise
-        val rawPressure = primary.pressure
-        _pressure.value = if (rawPressure <= 0f || rawPressure == 1f && pointers.size == 1) {
-            // Device doesn't support pressure — use hold intensity as proxy
-            _holdIntensity.value
-        } else {
-            rawPressure.coerceIn(0f, 1f)
+        // ── Pressure ──────────────────────────────────────────────────────
+        // Android MotionEvent.getPressure() is unreliable on most devices (always 1.0)
+        // getSize() (touch contact area) is a much better proxy for press force
+        val rawPressure  = primary.pressure   // 0.0–1.0 (often stuck at 1.0)
+        val rawSize      = primary.size        // 0.0–1.0 touch contact area
+
+        _pressure.value = when {
+            // Real pressure sensor available — use it
+            rawPressure > 0f && rawPressure < 0.99f -> rawPressure.coerceIn(0f, 1f)
+            // Fall back to touch size (wider touch = more pressure)
+            rawSize > 0f -> rawSize.coerceIn(0f, 1f)
+            // Last resort: hold intensity proxy
+            else -> _holdIntensity.value
         }
 
         lastX = x
-        lastY = primary.position.y
+        lastY = y
         lastEventTime = now
     }
 }
