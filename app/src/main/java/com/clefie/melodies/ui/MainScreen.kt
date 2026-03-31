@@ -14,6 +14,9 @@ import com.clefie.melodies.viewmodel.MainViewModel
 fun MainScreen(vm: MainViewModel) {
 
     val bpm           by vm.bpm.collectAsState()
+    val detectedBpm   by vm.detectedBpm.collectAsState()
+    val tapBpm        by vm.tapBpm.collectAsState()
+    val beatPulse     by vm.beatPulse.collectAsState()
     val amp           by vm.amplitude.collectAsState()
     val accel         by vm.accel.collectAsState()
     val gyro          by vm.gyro.collectAsState()
@@ -47,9 +50,33 @@ fun MainScreen(vm: MainViewModel) {
     ) {
         Text("Clefie Melodies", style = MaterialTheme.typography.headlineMedium)
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(Modifier.height(16.dp))
 
-        Text("BPM: ${bpm.toInt()}")
+        // BPM display — highlights on beat pulse
+        Text(
+            text = "BPM: ${bpm.toInt()}  ${if (beatPulse) "●" else "○"}",
+            style = MaterialTheme.typography.headlineSmall
+        )
+        Text("Detected: ${detectedBpm.toInt()}  Tapped: ${if (tapBpm > 0f) tapBpm.toInt().toString() else "-"}")
+
+        Spacer(Modifier.height(16.dp))
+
+        // Tap tempo buttons
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { vm.onTapBeat() }) {
+                Text("TAP BEAT")
+            }
+            Button(onClick = { vm.onSyncTap() }) {
+                Text("SYNC")
+            }
+            OutlinedButton(onClick = { vm.resetTapTempo() }) {
+                Text("RESET")
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Text("── Sensors ──", style = MaterialTheme.typography.labelSmall)
         Text("Mic: ${"%.2f".format(amp)}")
         Text("Motion: ${"%.2f".format(accel)}")
         Text("Gyro: ${"%.2f".format(gyro)} rad/s")
@@ -57,7 +84,7 @@ fun MainScreen(vm: MainViewModel) {
         Text("Shake: ${if (shake) "YES" else "-"}")
         Text("Tilt X: ${"%.1f".format(tiltX)}°  Y: ${"%.1f".format(tiltY)}°")
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
         Text("── Touch ──", style = MaterialTheme.typography.labelSmall)
         Text("Fingers: $fingerCount")
@@ -65,9 +92,5 @@ fun MainScreen(vm: MainViewModel) {
         Text("Hold: ${"%.2f".format(holdIntensity)}")
         Text("Pressure: ${"%.2f".format(pressure)}")
         Text("Velocity: ${"%.2f".format(swipeVelocity)}")
-
-        Spacer(modifier = Modifier.height(30.dp))
-
-        Text("Sequencer Running...", style = MaterialTheme.typography.bodyLarge)
     }
 }

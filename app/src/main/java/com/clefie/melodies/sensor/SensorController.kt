@@ -8,6 +8,7 @@ import android.hardware.SensorManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import com.clefie.melodies.engine.BeatDetector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -15,9 +16,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
-import kotlin.math.abs
 
 class SensorController(private val context: Context) : SensorEventListener {
 
@@ -27,6 +28,9 @@ class SensorController(private val context: Context) : SensorEventListener {
     private var accelerometerSensor: Sensor? = null
     private var gyroscopeSensor: Sensor? = null
     private var proximitySensor: Sensor? = null
+
+    // ── Beat detector ───────────────────────────────────────────────────────
+    val beatDetector = BeatDetector()
 
     // ── Exposed StateFlows ──────────────────────────────────────────────────
     private val _acceleration = MutableStateFlow(0f)
@@ -50,32 +54,32 @@ class SensorController(private val context: Context) : SensorEventListener {
     private val _tiltY = MutableStateFlow(0f)
     val tiltY: StateFlow<Float> = _tiltY
 
-    // ── Accelerometer filter state ──────────────────────────────────────────
+    // ── Accelerometer ───────────────────────────────────────────────────────
     private val accelGravity = FloatArray(3)
     private var accelLastOutput = 0f
     private val accelAlpha = 0.8f
     private val accelThreshold = 0.5f
     private val accelDamping = 0.85f
 
-    // ── Shake detection ─────────────────────────────────────────────────────
+    // ── Shake ───────────────────────────────────────────────────────────────
     private var lastMagnitude = 0f
-    private val shakeThreshold = 22f        // raised from 12 — requires deliberate shake
-    private val shakeCooldownMs = 800L      // extended — prevents rapid re-trigger
+    private val shakeThreshold = 22f
+    private val shakeCooldownMs = 800L
     private var lastShakeTime = 0L
     private var shakeResetJob: Job? = null
     private val shakeScope = CoroutineScope(Dispatchers.Default)
 
-    // ── Tilt dead zone ──────────────────────────────────────────────────────
-    private val tiltDeadZone = 3f           // degrees — kills resting noise
+    // ── Tilt ────────────────────────────────────────────────────────────────
+    private val tiltDeadZone = 3f
 
-    // ── Gyroscope filter state ──────────────────────────────────────────────
+    // ── Gyroscope ───────────────────────────────────────────────────────────
     private val gyroFiltered = FloatArray(3)
     private var gyroLastOutput = 0f
     private val gyroAlpha = 0.7f
     private val gyroThreshold = 0.05f
     private val gyroDamping = 0.90f
 
-    // ── AudioRecord ─────────────────────────────────────────────────────────
+    // ── Mic / AudioRecord ───────────────────────────────────────────────────
     private var audioRecord: AudioRecord? = null
     private var micJob: Job? = null
     private val micScope = CoroutineScope(Dispatchers.IO)
@@ -139,6 +143,7 @@ class SensorController(private val context: Context) : SensorEventListener {
             while (isActive) {
                 val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                 if (read > 0) {
+                    // RMS amplitude for volume display
                     var sum = 0.0
                     for (i in 0 until read) {
                         val sample = buffer[i].toDouble()
@@ -148,6 +153,10 @@ class SensorController(private val context: Context) : SensorEventListener {
                     val normalised = (rms / 32768.0).toFloat().coerceIn(0f, 1f)
                     micSmoothed = micSmoothing * normalised + (1f - micSmoothing) * micSmoothed
                     _amplitude.value = micSmoothed
+
+                    // Feed raw PCM to beat detector
+                    beatDetector.processPcmBuffer(buffer, read)
+                    beatDetector.resetPulse()
                 }
             }
         }
@@ -183,7 +192,6 @@ class SensorController(private val context: Context) : SensorEventListener {
         accelLastOutput = output
         _acceleration.value = output
 
-        // ── Shake ─────────────────────────────────────────────────────────
         val now = System.currentTimeMillis()
         val delta = magnitude - lastMagnitude
         if (delta > shakeThreshold && !_shake.value && (now - lastShakeTime) > shakeCooldownMs) {
@@ -197,11 +205,9 @@ class SensorController(private val context: Context) : SensorEventListener {
         }
         lastMagnitude = magnitude
 
-        // ── Tilt with dead zone ────────────────────────────────────────────
         val roll = Math.toDegrees(
             atan2(accelGravity[1].toDouble(), accelGravity[2].toDouble())
         ).toFloat()
-
         val pitch = Math.toDegrees(
             atan2(
                 (-accelGravity[0]).toDouble(),
