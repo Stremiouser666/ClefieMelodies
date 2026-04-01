@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
@@ -52,7 +53,6 @@ fun MainScreen(vm: MainViewModel) {
 
         Spacer(Modifier.height(16.dp))
 
-        // BPM display — highlights on beat pulse
         Text(
             text = "BPM: ${bpm.toInt()}  ${if (beatPulse) "●" else "○"}",
             style = MaterialTheme.typography.headlineSmall
@@ -61,7 +61,6 @@ fun MainScreen(vm: MainViewModel) {
 
         Spacer(Modifier.height(16.dp))
 
-        // Tap tempo buttons
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = { vm.onTapBeat() }) {
                 Text("TAP BEAT")
@@ -69,7 +68,13 @@ fun MainScreen(vm: MainViewModel) {
             Button(onClick = { vm.onSyncTap() }) {
                 Text("SYNC")
             }
-            OutlinedButton(onClick = { vm.resetTapTempo() }) {
+            Button(
+                onClick = { vm.resetTapTempo() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFB00020),
+                    contentColor = Color.White
+                )
+            ) {
                 Text("RESET")
             }
         }
@@ -82,7 +87,7 @@ fun MainScreen(vm: MainViewModel) {
         Text("Gyro: ${"%.2f".format(gyro)} rad/s")
         Text("Proximity: ${if (proximity) "NEAR" else "FAR"}")
         Text("Shake: ${if (shake) "YES" else "-"}")
-        Text("Tilt X: ${"%.1f".format(tiltX)}°  Y: ${"%.1f".format(tiltY)}°")
+        Text("Tilt X: ${"%.1f".format(tiltX)}  Y: ${"%.1f".format(tiltY)}")
 
         Spacer(Modifier.height(12.dp))
 
@@ -92,5 +97,9 @@ fun MainScreen(vm: MainViewModel) {
         Text("Hold: ${"%.2f".format(holdIntensity)}")
         Text("Pressure: ${"%.2f".format(pressure)}")
         Text("Velocity: ${"%.2f".format(swipeVelocity)}")
+
+        Spacer(Modifier.height(30.dp))
+
+        Text("Sequencer Running...", style = MaterialTheme.typography.bodyLarge)
     }
 }
