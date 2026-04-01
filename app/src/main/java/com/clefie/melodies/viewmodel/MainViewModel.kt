@@ -18,8 +18,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val tapTempo   = TapTempo()
     val gestures           = GestureController()
 
-    // ── BPM source tracking ─────────────────────────────────────────────────
-    // Priority: tap tempo > beat detection > motion/mic fallback
+    private var sensorsStarted = false
+
+    // ── BPM ────────────────────────────────────────────────────────────────
     private val _bpm = MutableStateFlow(120f)
     val bpm: StateFlow<Float> = _bpm
 
@@ -32,7 +33,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _detectedBpm = MutableStateFlow(120f)
     val detectedBpm: StateFlow<Float> = _detectedBpm
 
-    // ── Sensor StateFlows ───────────────────────────────────────────────────
+    // ── Sensors ────────────────────────────────────────────────────────────
     private val _amplitude = MutableStateFlow(0f)
     val amplitude: StateFlow<Float> = _amplitude
 
@@ -54,18 +55,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _tiltY     = MutableStateFlow(0f)
     val tiltY: StateFlow<Float> = _tiltY
 
-    // ── Gesture proxies ─────────────────────────────────────────────────────
+    // ── Gesture proxies ────────────────────────────────────────────────────
     val pitch         get() = gestures.pitch
     val holdIntensity get() = gestures.holdIntensity
     val fingerCount   get() = gestures.fingerCount
     val pressure      get() = gestures.pressure
     val swipeVelocity get() = gestures.swipeVelocity
 
-    init { start() }
+    // ── Called by MainActivity after permission granted ─────────────────────
+    fun startSensors() {
+        if (sensorsStarted) return   // guard against double-start
+        sensorsStarted = true
 
-    private fun start() {
         sensors.start()
+        collectFlows()
+        sequencer.start { /* Phase 4: trigger visual pulse */ }
+    }
 
+    private fun collectFlows() {
         viewModelScope.launch {
             sensors.amplitude.collect { value ->
                 _amplitude.value = value
@@ -113,48 +120,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             gestures.swipeVelocity.collect { updateBpm() }
         }
-
-        sequencer.start { /* Phase 4: trigger visual pulse on step */ }
     }
 
-    // ── BPM priority logic ──────────────────────────────────────────────────
     private fun updateBpm() {
         val finalBpm = when {
-            // Tap tempo takes priority when set
             _tapBpm.value > 0f -> _tapBpm.value
-
-            // Beat detection is available — use it, modulated by motion/velocity
             _detectedBpm.value > 0f -> {
                 val modulation = (_accel.value * 10f) +
                                  (gestures.swipeVelocity.value * 20f)
                 (_detectedBpm.value + modulation).coerceIn(40f, 240f)
             }
-
-            // Fallback: mic + motion only (no beat detected yet)
             else -> {
                 80f + (_amplitude.value * 80f) +
                       (_accel.value * 60f) +
                       (gestures.swipeVelocity.value * 40f)
             }
         }
-
         _bpm.value = finalBpm.coerceIn(40f, 240f)
         sequencer.setBpm(finalBpm)
     }
 
-    // ── Public tap actions ──────────────────────────────────────────────────
-    fun onTapBeat() {
-        tapTempo.onTap()
-    }
-
-    fun onSyncTap() {
-        tapTempo.onSyncTap()
-    }
-
-    fun resetTapTempo() {
-        tapTempo.reset()
-        updateBpm()
-    }
+    fun onTapBeat()      { tapTempo.onTap() }
+    fun onSyncTap()      { tapTempo.onSyncTap() }
+    fun resetTapTempo()  { tapTempo.reset(); updateBpm() }
 
     override fun onCleared() {
         super.onCleared()
