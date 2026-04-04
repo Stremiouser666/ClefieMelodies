@@ -5,28 +5,65 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.clefie.melodies.ui.MainScreen
+import com.clefie.melodies.ui.*
+import com.clefie.melodies.viewmodel.FlowStep
+import com.clefie.melodies.viewmodel.FlowViewModel
 import com.clefie.melodies.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
 
-    private var vm: MainViewModel? = null
+    private var mainVm: MainViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            val viewModel: MainViewModel = viewModel()
-            vm = viewModel
-            MainScreen(viewModel)
+            val flowVm: FlowViewModel = viewModel()
+            val vm: MainViewModel     = viewModel()
+            mainVm = vm
+
+            val step        by flowVm.step.collectAsState()
+            val isFullscreen by flowVm.isFullscreen.collectAsState()
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (step) {
+                    FlowStep.INTRO -> {
+                        IntroScreen(
+                            step          = step,
+                            onCreateSound = { flowVm.onCreateSound() }
+                        )
+                    }
+                    FlowStep.ACTIVATION, FlowStep.MAGIC -> {
+                        ActivationScreen(step = step)
+                    }
+                    FlowStep.DASHBOARD -> {
+                        MainScreen(
+                            vm     = vm,
+                            flowVm = flowVm
+                        )
+                    }
+                }
+
+                // Fullscreen visualizer overlay
+                if (isFullscreen) {
+                    FullscreenVisualizer(
+                        mainVm  = vm,
+                        flowVm  = flowVm,
+                        onClose = { flowVm.closeFullscreen() }
+                    )
+                }
+            }
         }
 
-        // If permission already granted (2nd+ launch) start immediately
         if (hasAudioPermission()) {
-            vm?.startSensors()
+            mainVm?.startSensors()
         } else {
             requestPermissions()
         }
@@ -34,27 +71,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Catches the case where user granted permission in system settings
-        // and returned to the app without a fresh launch
-        if (hasAudioPermission()) {
-            vm?.startSensors()
-        }
+        if (hasAudioPermission()) mainVm?.startSensors()
     }
 
-    private fun hasAudioPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            this, Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-    }
+    private fun hasAudioPermission() =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+        PackageManager.PERMISSION_GRANTED
 
     private fun requestPermissions() {
         ActivityCompat.requestPermissions(
             this,
-            arrayOf(
-                Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.BODY_SENSORS
-            ),
-            REQUEST_CODE
+            arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.BODY_SENSORS),
+            1001
         )
     }
 
@@ -64,14 +92,6 @@ class MainActivity : ComponentActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CODE) {
-            // Start sensors regardless — SensorController handles missing mic gracefully
-            // If audio was granted it will work, if not mic stays silent
-            vm?.startSensors()
-        }
-    }
-
-    companion object {
-        private const val REQUEST_CODE = 1001
+        if (requestCode == 1001) mainVm?.startSensors()
     }
 }
