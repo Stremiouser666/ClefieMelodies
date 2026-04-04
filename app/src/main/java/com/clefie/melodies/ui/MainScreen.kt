@@ -4,7 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,16 +26,13 @@ fun MainScreen(vm: MainViewModel, flowVm: FlowViewModel) {
     val beatPulse     by vm.beatPulse.collectAsState()
     val amp           by vm.amplitude.collectAsState()
     val accel         by vm.accel.collectAsState()
-    val gyro          by vm.gyro.collectAsState()
-    val proximity     by vm.proximity.collectAsState()
     val shake         by vm.shake.collectAsState()
+    val proximity     by vm.proximity.collectAsState()
     val tiltX         by vm.tiltX.collectAsState()
     val tiltY         by vm.tiltY.collectAsState()
-    val pitch         by vm.pitch.collectAsState()
     val holdIntensity by vm.holdIntensity.collectAsState()
-    val fingerCount   by vm.fingerCount.collectAsState()
-    val pressure      by vm.pressure.collectAsState()
     val swipeVelocity by vm.swipeVelocity.collectAsState()
+    val fingerCount   by vm.fingerCount.collectAsState()
 
     var screenWidth by remember { mutableStateOf(1f) }
 
@@ -63,22 +60,22 @@ fun MainScreen(vm: MainViewModel, flowVm: FlowViewModel) {
             Text(
                 "Clefie Melodies",
                 fontFamily = JackOfGearsFamily,
-                fontSize = 28.sp,
-                color = Color(0xFFEE80FF)
+                fontSize   = 28.sp,
+                color      = Color(0xFFEE80FF)
             )
 
             Spacer(Modifier.height(16.dp))
 
             Text(
-                text = "BPM: ${bpm.toInt()}  ${if (beatPulse) "●" else "○"}",
+                text       = "BPM: ${bpm.toInt()}  ${if (beatPulse) "●" else "○"}",
                 fontFamily = JackOfGearsFamily,
-                fontSize = 20.sp,
-                color = Color.White
+                fontSize   = 20.sp,
+                color      = Color.White
             )
             Text(
                 "Detected: ${detectedBpm.toInt()}  Tapped: ${if (tapBpm > 0f) tapBpm.toInt().toString() else "-"}",
                 fontFamily = PacificoFamily,
-                color = Color.White.copy(alpha = 0.7f)
+                color      = Color.White.copy(alpha = 0.7f)
             )
 
             Spacer(Modifier.height(16.dp))
@@ -108,12 +105,7 @@ fun MainScreen(vm: MainViewModel, flowVm: FlowViewModel) {
             Text("Shake: ${if (shake) "YES" else "-"}", color = Color.White, fontFamily = PacificoFamily)
             Text("Proximity: ${if (proximity) "NEAR" else "FAR"}", color = Color.White, fontFamily = PacificoFamily)
             Text("Tilt X: ${"%.1f".format(tiltX)}  Y: ${"%.1f".format(tiltY)}", color = Color.White, fontFamily = PacificoFamily)
-
-            Spacer(Modifier.height(12.dp))
-
-            Text("── Touch ──", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
-            Text("Fingers: $fingerCount", color = Color.White, fontFamily = PacificoFamily)
-            Text("Hold: ${"%.2f".format(holdIntensity)}", color = Color.White, fontFamily = PacificoFamily)
+            Text("Fingers: $fingerCount  Hold: ${"%.2f".format(holdIntensity)}", color = Color.White, fontFamily = PacificoFamily)
             Text("Velocity: ${"%.2f".format(swipeVelocity)}", color = Color.White, fontFamily = PacificoFamily)
         }
 
@@ -126,7 +118,7 @@ fun MainScreen(vm: MainViewModel, flowVm: FlowViewModel) {
                 .background(Color(0xFFE526AB), shape = CircleShape)
                 .size(56.dp)
         ) {
-            Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen", tint = Color.White)
+            Icon(Icons.Default.OpenInFull, contentDescription = "Fullscreen", tint = Color.White)
         }
     }
 }

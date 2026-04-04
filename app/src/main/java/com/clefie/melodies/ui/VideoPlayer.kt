@@ -48,7 +48,6 @@ fun VideoPlayer(
                 player = exoPlayer
                 useController = false
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                surfaceType = PlayerView.SURFACE_TYPE_TEXTURE_VIEW
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
             }
         },
