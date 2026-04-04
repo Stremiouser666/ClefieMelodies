@@ -1,6 +1,8 @@
 package com.clefie.melodies.ui
 
+import android.graphics.PixelFormat
 import android.net.Uri
+import android.view.TextureView
 import androidx.annotation.OptIn
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -10,8 +12,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -19,7 +19,8 @@ fun VideoPlayer(
     assetPath: String,
     modifier: Modifier = Modifier,
     loop: Boolean = true,
-    speed: Float = 1f
+    speed: Float = 1f,
+    transparent: Boolean = false
 ) {
     val context = LocalContext.current
 
@@ -44,11 +45,15 @@ fun VideoPlayer(
 
     AndroidView(
         factory = { ctx ->
-            PlayerView(ctx).apply {
-                player = exoPlayer
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            TextureView(ctx).apply {
+                if (transparent) {
+                    // Enable alpha compositing for transparency
+                    isOpaque = false
+                    surfaceTexture?.let { st ->
+                        // Will be set once surface is available
+                    }
+                }
+                exoPlayer.setVideoTextureView(this)
             }
         },
         modifier = modifier
