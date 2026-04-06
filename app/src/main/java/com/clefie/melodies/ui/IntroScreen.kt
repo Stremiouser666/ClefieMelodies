@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
@@ -21,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.geometry.Offset
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.GifDecoder
@@ -46,18 +46,17 @@ fun IntroScreen(
     step: FlowStep,
     onCreateSound: () -> Unit
 ) {
-    val context = LocalContext.current
+    val context   = LocalContext.current
     val gifLoader = remember { gifImageLoader(context) }
 
-    // Letter by letter reveal
     val fullText = "Feel the music. Live the moment."
     var visibleChars by remember { mutableStateOf(0) }
     var buttonAlpha  by remember { mutableStateOf(0f) }
 
     val buttonAlphaAnim by animateFloatAsState(
-        targetValue    = buttonAlpha,
-        animationSpec  = tween(1000),
-        label          = "buttonAlpha"
+        targetValue   = buttonAlpha,
+        animationSpec = tween(1000),
+        label         = "buttonAlpha"
     )
 
     val screenAlpha by animateFloatAsState(
@@ -69,7 +68,7 @@ fun IntroScreen(
     LaunchedEffect(Unit) {
         delay(600)
         fullText.forEachIndexed { index, _ ->
-            delay(40)   // 40ms per letter = smooth reveal
+            delay(70)   // 70ms per letter — smooth and readable
             visibleChars = index + 1
         }
         delay(500)
@@ -108,14 +107,14 @@ fun IntroScreen(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 40.dp)
         ) {
-            // Animated logo — 50% bigger
+            // Animated logo
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data("file:///android_asset/images/Logo_animated.gif")
                     .build(),
-                imageLoader       = gifLoader,
+                imageLoader        = gifLoader,
                 contentDescription = "Clefie Logo",
-                modifier          = Modifier
+                modifier           = Modifier
                     .fillMaxWidth(0.9f)
                     .aspectRatio(2.2f)
             )
@@ -130,18 +129,18 @@ fun IntroScreen(
                 modifier           = Modifier.size(200.dp)
             )
 
-            // Letter by letter text with shadow
+            // Letter by letter text
             Text(
-                text       = fullText.take(visibleChars),
-                style      = TextStyle(
-                    fontFamily  = PacificoFamily,
-                    fontSize    = 26.sp,
-                    color       = Color.White,
-                    textAlign   = TextAlign.Center,
-                    lineHeight  = 38.sp,
-                    shadow      = Shadow(
-                        color  = Color(0xFFE526AB),
-                        offset = Offset(0f, 4f),
+                text  = fullText.take(visibleChars),
+                style = TextStyle(
+                    fontFamily = PacificoFamily,
+                    fontSize   = 26.sp,
+                    color      = Color.White,
+                    textAlign  = TextAlign.Center,
+                    lineHeight = 38.sp,
+                    shadow     = Shadow(
+                        color      = Color(0xFFE526AB),
+                        offset     = Offset(0f, 4f),
                         blurRadius = 12f
                     )
                 )
@@ -151,7 +150,7 @@ fun IntroScreen(
 
             // CREATE MY SOUND button
             Button(
-                onClick = onCreateSound,
+                onClick  = onCreateSound,
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
                     .height(62.dp)
@@ -163,13 +162,13 @@ fun IntroScreen(
                 shape = RoundedCornerShape(31.dp)
             ) {
                 Text(
-                    text       = "CREATE MY SOUND",
-                    fontFamily = JackOfGearsFamily,
-                    fontSize   = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign  = TextAlign.Center,
+                    text          = "CREATE MY SOUND",
+                    fontFamily    = JackOfGearsFamily,
+                    fontSize      = 18.sp,
+                    fontWeight    = FontWeight.Bold,
+                    textAlign     = TextAlign.Center,
                     letterSpacing = 2.sp,
-                    modifier   = Modifier.fillMaxWidth()
+                    modifier      = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -177,21 +176,37 @@ fun IntroScreen(
 }
 
 @Composable
-fun ActivationScreen(step: FlowStep) {
+fun ActivationScreen(
+    step: FlowStep,
+    onReady: () -> Unit
+) {
     val context   = LocalContext.current
     val gifLoader = remember { gifImageLoader(context) }
 
     val fullText = if (step == FlowStep.MAGIC)
         "Your sound is alive..." else "Creating your sound..."
 
-    var visibleChars by remember(step) { mutableStateOf(0) }
+    var visibleChars  by remember(step) { mutableStateOf(0) }
+    var textComplete  by remember(step) { mutableStateOf(false) }
+    var buttonAlpha   by remember(step) { mutableStateOf(0f) }
+
+    val buttonAlphaAnim by animateFloatAsState(
+        targetValue   = buttonAlpha,
+        animationSpec = tween(800),
+        label         = "readyButtonAlpha"
+    )
 
     LaunchedEffect(step) {
         visibleChars = 0
+        textComplete = false
+        buttonAlpha  = 0f
         fullText.forEachIndexed { index, _ ->
-            delay(45)
+            delay(70)   // 70ms per letter
             visibleChars = index + 1
         }
+        textComplete = true
+        delay(400)
+        buttonAlpha = 1f
     }
 
     val alpha by animateFloatAsState(
@@ -226,9 +241,9 @@ fun ActivationScreen(step: FlowStep) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .offset(y = (-40).dp)   // slightly higher
+                    .offset(y = (-40).dp)
             ) {
-                // Mascot talking — slightly higher
+                // Mascot talking
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data("file:///android_asset/images/Mascot_talk.gif")
@@ -256,6 +271,32 @@ fun ActivationScreen(step: FlowStep) {
                     ),
                     modifier = Modifier.padding(horizontal = 32.dp)
                 )
+
+                Spacer(Modifier.height(28.dp))
+
+                // READY TO CREATE button — appears after text finishes
+                Button(
+                    onClick  = onReady,
+                    modifier = Modifier
+                        .fillMaxWidth(0.75f)
+                        .height(58.dp)
+                        .alpha(buttonAlphaAnim),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFE526AB),
+                        contentColor   = Color.White
+                    ),
+                    shape = RoundedCornerShape(29.dp)
+                ) {
+                    Text(
+                        text          = "READY TO CREATE",
+                        fontFamily    = JackOfGearsFamily,
+                        fontSize      = 16.sp,
+                        fontWeight    = FontWeight.Bold,
+                        textAlign     = TextAlign.Center,
+                        letterSpacing = 2.sp,
+                        modifier      = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }

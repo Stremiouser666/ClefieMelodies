@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.clefie.melodies.ui.*
 import com.clefie.melodies.viewmodel.FlowStep
@@ -23,7 +25,18 @@ class MainActivity : ComponentActivity() {
     private var flowVm: FlowViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Install splash screen BEFORE super.onCreate
+        installSplashScreen()
+
         super.onCreate(savedInstanceState)
+
+        // Back press — navigate one step back, do nothing on intro
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                flowVm?.goBack()
+                // Returns false on INTRO = do nothing, app stays open
+            }
+        })
 
         setContent {
             val fvm: FlowViewModel = viewModel()
@@ -40,19 +53,20 @@ class MainActivity : ComponentActivity() {
                         IntroScreen(
                             step = step,
                             onCreateSound = {
-                                // Request permissions HERE — user is already engaged
                                 if (hasAudioPermission()) {
                                     mainVm?.startSensors()
                                     fvm.onCreateSound()
                                 } else {
                                     requestPermissions()
-                                    // Flow will continue in onRequestPermissionsResult
                                 }
                             }
                         )
                     }
                     FlowStep.ACTIVATION, FlowStep.MAGIC -> {
-                        ActivationScreen(step = step)
+                        ActivationScreen(
+                            step    = step,
+                            onReady = { fvm.onReadyToCreate() }
+                        )
                     }
                     FlowStep.DASHBOARD -> {
                         MainScreen(vm = vm, flowVm = fvm)
@@ -68,12 +82,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        // No permissions requested on launch — delayed to CREATE MY SOUND tap
     }
 
     override fun onResume() {
         super.onResume()
-        // If permission was granted via settings and user returned
         if (hasAudioPermission()) mainVm?.startSensors()
     }
 
@@ -96,7 +108,6 @@ class MainActivity : ComponentActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 1001) {
-            // Start sensors regardless — SensorController handles missing mic gracefully
             mainVm?.startSensors()
             flowVm?.onCreateSound()
         }

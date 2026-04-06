@@ -26,10 +26,25 @@ class FlowViewModel : ViewModel() {
     fun onCreateSound() {
         viewModelScope.launch {
             _step.value = FlowStep.ACTIVATION
-            delay(3000)
+        }
+    }
+
+    // Called when user taps READY TO CREATE on activation/magic screen
+    fun onReadyToCreate() {
+        viewModelScope.launch {
             _step.value = FlowStep.MAGIC
             delay(4000)
             _step.value = FlowStep.DASHBOARD
+        }
+    }
+
+    // Back navigation — one step back, do nothing on intro
+    fun goBack(): Boolean {
+        return when (_step.value) {
+            FlowStep.DASHBOARD   -> { _step.value = FlowStep.INTRO; true }
+            FlowStep.MAGIC       -> { _step.value = FlowStep.ACTIVATION; true }
+            FlowStep.ACTIVATION  -> { _step.value = FlowStep.INTRO; true }
+            FlowStep.INTRO       -> false // do nothing, don't exit
         }
     }
 
