@@ -10,8 +10,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clefie.melodies.viewmodel.FlowViewModel
@@ -53,23 +58,33 @@ fun MainScreen(vm: MainViewModel, flowVm: FlowViewModel) {
                         }
                     }
                 }
-                .padding(20.dp),
-            verticalArrangement = Arrangement.Center,
+                .padding(horizontal = 20.dp)
+                .padding(top = 48.dp, bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Title — twice the size, bold, at the top
             Text(
-                "Clefie Melodies",
-                fontFamily = JackOfGearsFamily,
-                fontSize   = 28.sp,
-                color      = Color(0xFFEE80FF)
+                text  = "Clefie Melodies",
+                style = TextStyle(
+                    fontFamily  = JackOfGearsFamily,
+                    fontSize    = 48.sp,
+                    fontWeight  = FontWeight.Bold,
+                    color       = Color(0xFFEE80FF),
+                    textAlign   = TextAlign.Center,
+                    shadow      = Shadow(
+                        color      = Color(0xFFE526AB),
+                        offset     = Offset(0f, 4f),
+                        blurRadius = 16f
+                    )
+                )
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(24.dp))
 
             Text(
                 text       = "BPM: ${bpm.toInt()}  ${if (beatPulse) "●" else "○"}",
                 fontFamily = JackOfGearsFamily,
-                fontSize   = 20.sp,
+                fontSize   = 22.sp,
                 color      = Color.White
             )
             Text(
@@ -78,26 +93,26 @@ fun MainScreen(vm: MainViewModel, flowVm: FlowViewModel) {
                 color      = Color.White.copy(alpha = 0.7f)
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     onClick = { vm.onTapBeat() },
                     colors  = ButtonDefaults.buttonColors(containerColor = Color(0xFFE526AB))
-                ) { Text("TAP BEAT", fontFamily = PacificoFamily) }
+                ) { Text("TAP BEAT", fontFamily = PacificoFamily, fontWeight = FontWeight.Bold) }
 
                 Button(
                     onClick = { vm.onSyncTap() },
                     colors  = ButtonDefaults.buttonColors(containerColor = Color(0xFFEE80FF))
-                ) { Text("SYNC", fontFamily = PacificoFamily, color = Color.Black) }
+                ) { Text("SYNC", fontFamily = PacificoFamily, color = Color.Black, fontWeight = FontWeight.Bold) }
 
                 Button(
                     onClick = { vm.resetTapTempo() },
                     colors  = ButtonDefaults.buttonColors(containerColor = Color(0xFFB00020))
-                ) { Text("RESET", fontFamily = PacificoFamily) }
+                ) { Text("RESET", fontFamily = PacificoFamily, fontWeight = FontWeight.Bold) }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
 
             Text("── Sensors ──", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
             Text("Mic: ${"%.2f".format(amp)}", color = Color.White, fontFamily = PacificoFamily)

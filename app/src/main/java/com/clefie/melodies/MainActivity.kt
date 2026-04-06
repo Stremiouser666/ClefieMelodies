@@ -20,57 +20,60 @@ import com.clefie.melodies.viewmodel.MainViewModel
 class MainActivity : ComponentActivity() {
 
     private var mainVm: MainViewModel? = null
+    private var flowVm: FlowViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            val flowVm: FlowViewModel = viewModel()
-            val vm: MainViewModel     = viewModel()
+            val fvm: FlowViewModel = viewModel()
+            val vm: MainViewModel  = viewModel()
             mainVm = vm
+            flowVm = fvm
 
-            val step        by flowVm.step.collectAsState()
-            val isFullscreen by flowVm.isFullscreen.collectAsState()
+            val step         by fvm.step.collectAsState()
+            val isFullscreen by fvm.isFullscreen.collectAsState()
 
             Box(modifier = Modifier.fillMaxSize()) {
                 when (step) {
                     FlowStep.INTRO -> {
                         IntroScreen(
-                            step          = step,
-                            onCreateSound = { flowVm.onCreateSound() }
+                            step = step,
+                            onCreateSound = {
+                                // Request permissions HERE — user is already engaged
+                                if (hasAudioPermission()) {
+                                    mainVm?.startSensors()
+                                    fvm.onCreateSound()
+                                } else {
+                                    requestPermissions()
+                                    // Flow will continue in onRequestPermissionsResult
+                                }
+                            }
                         )
                     }
                     FlowStep.ACTIVATION, FlowStep.MAGIC -> {
                         ActivationScreen(step = step)
                     }
                     FlowStep.DASHBOARD -> {
-                        MainScreen(
-                            vm     = vm,
-                            flowVm = flowVm
-                        )
+                        MainScreen(vm = vm, flowVm = fvm)
                     }
                 }
 
-                // Fullscreen visualizer overlay
                 if (isFullscreen) {
                     FullscreenVisualizer(
                         mainVm  = vm,
-                        flowVm  = flowVm,
-                        onClose = { flowVm.closeFullscreen() }
+                        flowVm  = fvm,
+                        onClose = { fvm.closeFullscreen() }
                     )
                 }
             }
         }
-
-        if (hasAudioPermission()) {
-            mainVm?.startSensors()
-        } else {
-            requestPermissions()
-        }
+        // No permissions requested on launch — delayed to CREATE MY SOUND tap
     }
 
     override fun onResume() {
         super.onResume()
+        // If permission was granted via settings and user returned
         if (hasAudioPermission()) mainVm?.startSensors()
     }
 
@@ -92,6 +95,10 @@ class MainActivity : ComponentActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001) mainVm?.startSensors()
+        if (requestCode == 1001) {
+            // Start sensors regardless — SensorController handles missing mic gracefully
+            mainVm?.startSensors()
+            flowVm?.onCreateSound()
+        }
     }
 }
