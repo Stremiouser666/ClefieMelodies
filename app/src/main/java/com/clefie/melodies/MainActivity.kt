@@ -12,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.clefie.melodies.ui.*
 import com.clefie.melodies.viewmodel.FlowStep
@@ -25,16 +24,12 @@ class MainActivity : ComponentActivity() {
     private var flowVm: FlowViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Install splash screen BEFORE super.onCreate
-        installSplashScreen()
-
         super.onCreate(savedInstanceState)
 
-        // Back press — navigate one step back, do nothing on intro
+        // Back press — one step back, do nothing on intro
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 flowVm?.goBack()
-                // Returns false on INTRO = do nothing, app stays open
             }
         })
 

@@ -1,17 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Main app theme -->
     <style name="Theme.ClefieMelodies" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="colorPrimary">@color/purple_500</item>
         <item name="colorPrimaryDark">@color/purple_500</item>
         <item name="colorAccent">@color/purple_500</item>
-    </style>
-
-    <!-- Splash screen theme -->
-    <style name="Theme.ClefieMelodies.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#000000</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
-        <item name="windowSplashScreenIconBackgroundColor">#000000</item>
-        <item name="postSplashScreenTheme">@style/Theme.ClefieMelodies</item>
+        <item name="android:windowBackground">@android:color/black</item>
     </style>
 </resources>

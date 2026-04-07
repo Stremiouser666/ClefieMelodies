@@ -2,10 +2,11 @@ package com.clefie.melodies.ui
 
 import android.os.Build
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -13,15 +14,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Text
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.GifDecoder
@@ -68,7 +69,7 @@ fun IntroScreen(
     LaunchedEffect(Unit) {
         delay(600)
         fullText.forEachIndexed { index, _ ->
-            delay(70)   // 70ms per letter — smooth and readable
+            delay(70)
             visibleChars = index + 1
         }
         delay(500)
@@ -85,19 +86,13 @@ fun IntroScreen(
         // Animated background
         VideoPlayer(
             assetPath = "images/Background_animated.webm",
-            modifier  = Modifier
-                .fillMaxSize()
-                .alpha(0.5f),
-            loop  = true,
-            speed = 0.6f
+            modifier  = Modifier.fillMaxSize().alpha(0.5f),
+            loop      = true,
+            speed     = 0.6f
         )
 
         // Dark overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-        )
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -107,19 +102,17 @@ fun IntroScreen(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 40.dp)
         ) {
-            // Animated logo
+            // Animated logo — loops forever
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data("file:///android_asset/images/Logo_animated.gif")
                     .build(),
                 imageLoader        = gifLoader,
                 contentDescription = "Clefie Logo",
-                modifier           = Modifier
-                    .fillMaxWidth(0.9f)
-                    .aspectRatio(2.2f)
+                modifier           = Modifier.fillMaxWidth(0.9f).aspectRatio(2.2f)
             )
 
-            // Mascot waving
+            // Mascot waving — loops forever
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data("file:///android_asset/images/Mascot_wave.gif")
@@ -148,27 +141,24 @@ fun IntroScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // CREATE MY SOUND button
-            Button(
-                onClick  = onCreateSound,
+            // Custom PNG button — Create my Sound
+            Box(
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
-                    .height(62.dp)
-                    .alpha(buttonAlphaAnim),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE526AB),
-                    contentColor   = Color.White
-                ),
-                shape = RoundedCornerShape(31.dp)
+                    .aspectRatio(3.2f)
+                    .alpha(buttonAlphaAnim)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication        = null
+                    ) { onCreateSound() },
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text          = "CREATE MY SOUND",
-                    fontFamily    = JackOfGearsFamily,
-                    fontSize      = 18.sp,
-                    fontWeight    = FontWeight.Bold,
-                    textAlign     = TextAlign.Center,
-                    letterSpacing = 2.sp,
-                    modifier      = Modifier.fillMaxWidth()
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data("file:///android_asset/images/Button_create_my_sound.png")
+                        .build(),
+                    contentDescription = "Create my Sound",
+                    modifier           = Modifier.fillMaxSize()
                 )
             }
         }
@@ -186,9 +176,8 @@ fun ActivationScreen(
     val fullText = if (step == FlowStep.MAGIC)
         "Your sound is alive..." else "Creating your sound..."
 
-    var visibleChars  by remember(step) { mutableStateOf(0) }
-    var textComplete  by remember(step) { mutableStateOf(false) }
-    var buttonAlpha   by remember(step) { mutableStateOf(0f) }
+    var visibleChars by remember(step) { mutableStateOf(0) }
+    var buttonAlpha  by remember(step) { mutableStateOf(0f) }
 
     val buttonAlphaAnim by animateFloatAsState(
         targetValue   = buttonAlpha,
@@ -196,16 +185,18 @@ fun ActivationScreen(
         label         = "readyButtonAlpha"
     )
 
+    // Talk GIF plays twice — approx duration of 2 loops before button shows
+    // Coil doesn't expose loop count directly so we time it:
+    // text reveal + 500ms delay before button appears after text fully done
     LaunchedEffect(step) {
         visibleChars = 0
-        textComplete = false
         buttonAlpha  = 0f
         fullText.forEachIndexed { index, _ ->
-            delay(70)   // 70ms per letter
+            delay(70)
             visibleChars = index + 1
         }
-        textComplete = true
-        delay(400)
+        // Wait for text to fully finish before showing button
+        delay(600)
         buttonAlpha = 1f
     }
 
@@ -231,11 +222,7 @@ fun ActivationScreen(
             )
 
             // Dark overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
-            )
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -243,10 +230,11 @@ fun ActivationScreen(
                     .align(Alignment.Center)
                     .offset(y = (-40).dp)
             ) {
-                // Mascot talking
+                // Mascot talking — plays twice via timed repeatCount
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data("file:///android_asset/images/Mascot_talk.gif")
+                        .repeatCount(1)  // 0 = once, 1 = twice, INFINITE = forever
                         .build(),
                     imageLoader        = gifLoader,
                     contentDescription = "Mascot talking",
@@ -255,7 +243,7 @@ fun ActivationScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // Smooth letter by letter text
+                // Letter by letter text
                 Text(
                     text  = fullText.take(visibleChars),
                     style = TextStyle(
@@ -274,27 +262,25 @@ fun ActivationScreen(
 
                 Spacer(Modifier.height(28.dp))
 
-                // READY TO CREATE button — appears after text finishes
-                Button(
-                    onClick  = onReady,
+                // Custom PNG button — Let's Create
+                // Only appears after ALL text has finished
+                Box(
                     modifier = Modifier
                         .fillMaxWidth(0.75f)
-                        .height(58.dp)
-                        .alpha(buttonAlphaAnim),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFE526AB),
-                        contentColor   = Color.White
-                    ),
-                    shape = RoundedCornerShape(29.dp)
+                        .aspectRatio(3.2f)
+                        .alpha(buttonAlphaAnim)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication        = null
+                        ) { onReady() },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text          = "READY TO CREATE",
-                        fontFamily    = JackOfGearsFamily,
-                        fontSize      = 16.sp,
-                        fontWeight    = FontWeight.Bold,
-                        textAlign     = TextAlign.Center,
-                        letterSpacing = 2.sp,
-                        modifier      = Modifier.fillMaxWidth()
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data("file:///android_asset/images/Button_lets_create.png")
+                            .build(),
+                        contentDescription = "Let's Create",
+                        modifier           = Modifier.fillMaxSize()
                     )
                 }
             }
