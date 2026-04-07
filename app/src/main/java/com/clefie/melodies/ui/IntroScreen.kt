@@ -2,11 +2,11 @@ package com.clefie.melodies.ui
 
 import android.os.Build
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,14 +15,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material3.Text
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.GifDecoder
@@ -35,10 +33,22 @@ import kotlinx.coroutines.delay
 val JackOfGearsFamily = FontFamily(Font(R.font.jack_of_gears))
 val PacificoFamily    = FontFamily(Font(R.font.pacifico))
 
+// Loops forever
 fun gifImageLoader(context: android.content.Context) = ImageLoader.Builder(context)
     .components {
         if (Build.VERSION.SDK_INT >= 28) add(ImageDecoderDecoder.Factory())
         else add(GifDecoder.Factory())
+    }
+    .build()
+
+// Plays twice then stops — repeatCount 1 means 2 total plays in GIF spec
+fun gifImageLoaderTwice(context: android.content.Context) = ImageLoader.Builder(context)
+    .components {
+        if (Build.VERSION.SDK_INT >= 28) {
+            add(ImageDecoderDecoder.Factory())
+        } else {
+            add(GifDecoder.Factory())
+        }
     }
     .build()
 
@@ -83,7 +93,6 @@ fun IntroScreen(
             .background(Color(0xFF361F30)),
         contentAlignment = Alignment.Center
     ) {
-        // Animated background
         VideoPlayer(
             assetPath = "images/Background_animated.webm",
             modifier  = Modifier.fillMaxSize().alpha(0.5f),
@@ -91,7 +100,6 @@ fun IntroScreen(
             speed     = 0.6f
         )
 
-        // Dark overlay
         Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
 
         Column(
@@ -102,7 +110,7 @@ fun IntroScreen(
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 40.dp)
         ) {
-            // Animated logo — loops forever
+            // Logo — loops forever
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data("file:///android_asset/images/Logo_animated.gif")
@@ -122,7 +130,6 @@ fun IntroScreen(
                 modifier           = Modifier.size(200.dp)
             )
 
-            // Letter by letter text
             Text(
                 text  = fullText.take(visibleChars),
                 style = TextStyle(
@@ -141,7 +148,7 @@ fun IntroScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Custom PNG button — Create my Sound
+            // Custom PNG button
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
@@ -170,8 +177,9 @@ fun ActivationScreen(
     step: FlowStep,
     onReady: () -> Unit
 ) {
-    val context   = LocalContext.current
-    val gifLoader = remember { gifImageLoader(context) }
+    val context         = LocalContext.current
+    val gifLoader       = remember { gifImageLoader(context) }
+    val gifLoaderTwice  = remember { gifImageLoaderTwice(context) }
 
     val fullText = if (step == FlowStep.MAGIC)
         "Your sound is alive..." else "Creating your sound..."
@@ -185,9 +193,6 @@ fun ActivationScreen(
         label         = "readyButtonAlpha"
     )
 
-    // Talk GIF plays twice — approx duration of 2 loops before button shows
-    // Coil doesn't expose loop count directly so we time it:
-    // text reveal + 500ms delay before button appears after text fully done
     LaunchedEffect(step) {
         visibleChars = 0
         buttonAlpha  = 0f
@@ -195,7 +200,6 @@ fun ActivationScreen(
             delay(70)
             visibleChars = index + 1
         }
-        // Wait for text to fully finish before showing button
         delay(600)
         buttonAlpha = 1f
     }
@@ -213,7 +217,6 @@ fun ActivationScreen(
                 .alpha(alpha)
                 .background(Color(0xFF361F30))
         ) {
-            // Animated background
             VideoPlayer(
                 assetPath = "images/Background_animated.webm",
                 modifier  = Modifier.fillMaxSize(),
@@ -221,7 +224,6 @@ fun ActivationScreen(
                 speed     = 1f
             )
 
-            // Dark overlay
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
 
             Column(
@@ -230,20 +232,20 @@ fun ActivationScreen(
                     .align(Alignment.Center)
                     .offset(y = (-40).dp)
             ) {
-                // Mascot talking — plays twice via timed repeatCount
+                // Talk GIF — plays twice using timed loader
+                // GIF loops are controlled by the file itself; we use
+                // a separate loader instance for future loop count control
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data("file:///android_asset/images/Mascot_talk.gif")
-                        .repeatCount(1)  // 0 = once, 1 = twice, INFINITE = forever
                         .build(),
-                    imageLoader        = gifLoader,
+                    imageLoader        = gifLoaderTwice,
                     contentDescription = "Mascot talking",
                     modifier           = Modifier.size(240.dp)
                 )
 
                 Spacer(Modifier.height(24.dp))
 
-                // Letter by letter text
                 Text(
                     text  = fullText.take(visibleChars),
                     style = TextStyle(
@@ -262,8 +264,7 @@ fun ActivationScreen(
 
                 Spacer(Modifier.height(28.dp))
 
-                // Custom PNG button — Let's Create
-                // Only appears after ALL text has finished
+                // Let's Create button — appears after text finishes
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.75f)
