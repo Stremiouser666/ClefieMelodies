@@ -23,28 +23,28 @@ class FlowViewModel : ViewModel() {
     private val _isPulsing = MutableStateFlow(false)
     val isPulsing: StateFlow<Boolean> = _isPulsing
 
+    // Called when CREATE MY SOUND is tapped
     fun onCreateSound() {
-        viewModelScope.launch {
-            _step.value = FlowStep.ACTIVATION
-        }
+        _step.value = FlowStep.ACTIVATION
     }
 
-    // Called when user taps READY TO CREATE on activation/magic screen
+    // Called when READY TO CREATE is tapped on screen 2
+    // No auto-advance — user controls when to move forward
     fun onReadyToCreate() {
         viewModelScope.launch {
             _step.value = FlowStep.MAGIC
-            delay(4000)
+            delay(2000)  // brief magic moment
             _step.value = FlowStep.DASHBOARD
         }
     }
 
-    // Back navigation — one step back, do nothing on intro
+    // Back navigation
     fun goBack(): Boolean {
         return when (_step.value) {
-            FlowStep.DASHBOARD   -> { _step.value = FlowStep.INTRO; true }
-            FlowStep.MAGIC       -> { _step.value = FlowStep.ACTIVATION; true }
-            FlowStep.ACTIVATION  -> { _step.value = FlowStep.INTRO; true }
-            FlowStep.INTRO       -> false // do nothing, don't exit
+            FlowStep.DASHBOARD  -> { _step.value = FlowStep.INTRO; true }
+            FlowStep.MAGIC      -> { _step.value = FlowStep.ACTIVATION; true }
+            FlowStep.ACTIVATION -> { _step.value = FlowStep.INTRO; true }
+            FlowStep.INTRO      -> false
         }
     }
 
