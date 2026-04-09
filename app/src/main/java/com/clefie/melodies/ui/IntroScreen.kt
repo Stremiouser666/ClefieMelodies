@@ -50,14 +50,14 @@ fun PressableImageButton(
 ) {
     val context = LocalContext.current
     val scope   = rememberCoroutineScope()
-
     var pressed by remember { mutableStateOf(false) }
+
     val scale by animateFloatAsState(
         targetValue   = if (pressed) 0.93f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label         = "btnScale"
     )
-    val alpha by animateFloatAsState(
+    val btnAlpha by animateFloatAsState(
         targetValue   = if (pressed) 0.75f else 1f,
         animationSpec = tween(80),
         label         = "btnAlpha"
@@ -66,7 +66,7 @@ fun PressableImageButton(
     Box(
         modifier = modifier
             .scale(scale)
-            .alpha(alpha)
+            .alpha(btnAlpha)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
@@ -149,13 +149,12 @@ fun IntroScreen(
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.Center,
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 40.dp)
+                .padding(vertical = 24.dp)
         ) {
-            // Logo — loops forever
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data("file:///android_asset/images/Logo_animated.gif")
@@ -165,7 +164,8 @@ fun IntroScreen(
                 modifier           = Modifier.fillMaxWidth(0.9f).aspectRatio(2.2f)
             )
 
-            // Mascot waving — loops forever
+            Spacer(Modifier.height(16.dp))
+
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data("file:///android_asset/images/Mascot_wave.gif")
@@ -174,6 +174,8 @@ fun IntroScreen(
                 contentDescription = "Mascot waving",
                 modifier           = Modifier.size(200.dp)
             )
+
+            Spacer(Modifier.height(16.dp))
 
             Text(
                 text  = fullText.take(visibleChars),
@@ -191,15 +193,14 @@ fun IntroScreen(
                 )
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Create my Sound — full width, twice the size, press effect
             PressableImageButton(
                 assetPath = "images/Button_create_my_sound.png",
                 onClick   = onCreateSound,
                 modifier  = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(3.0f)
+                    .fillMaxWidth(0.95f)
+                    .height(130.dp)
                     .alpha(buttonAlphaAnim)
             )
         }
@@ -216,9 +217,42 @@ fun ActivationScreen(
 
     val fullText = "Creating your sound...\nGet ready to make something magical."
 
-    var visibleChars    by remember { mutableStateOf(0) }
-    var buttonAlpha     by remember { mutableStateOf(0f) }
+    var visibleChars     by remember { mutableStateOf(0) }
+    var buttonAlpha      by remember { mutableStateOf(0f) }
     var showStaticMascot by remember { mutableStateOf(false) }
+
+    // remembered flag — guarantees LaunchedEffect only ever runs once
+    // even if the composable recomposes
+    val started = remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (started.value) return@LaunchedEffect
+        started.value = true
+
+        showStaticMascot = false
+        visibleChars     = 0
+        buttonAlpha      = 0f
+
+        // Swap mascot to static after talk GIF plays once (~6.2s)
+        launch {
+            delay(6200)
+            showStaticMascot = true
+        }
+
+        delay(800)
+        fullText.forEachIndexed { index, _ ->
+            delay(70)
+            visibleChars = index + 1
+        }
+        delay(600)
+        buttonAlpha = 1f
+    }
+
+    val screenAlpha by animateFloatAsState(
+        targetValue   = if (step == FlowStep.ACTIVATION) 1f else 0f,
+        animationSpec = tween(800),
+        label         = "activationAlpha"
+    )
 
     val buttonAlphaAnim by animateFloatAsState(
         targetValue   = buttonAlpha,
@@ -226,109 +260,78 @@ fun ActivationScreen(
         label         = "readyButtonAlpha"
     )
 
-    LaunchedEffect(step) {
-        visibleChars     = 0
-        buttonAlpha      = 0f
-        showStaticMascot = false
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .alpha(screenAlpha)
+            .background(Color(0xFF361F30))
+    ) {
+        VideoPlayer(
+            assetPath = "images/Background_animated.webm",
+            modifier  = Modifier.fillMaxSize(),
+            loop      = true,
+            speed     = 1f
+        )
 
-        // Talk GIF plays once (~5.8s) — swap to static after
-        launch {
-            delay(6200)
-            showStaticMascot = true
-        }
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
 
-        // Text reveal — waits for ALL text before showing button
-        delay(800)
-        fullText.forEachIndexed { index, _ ->
-            delay(70)
-            visibleChars = index + 1
-        }
-        // Button only appears after complete text is shown
-        delay(600)
-        buttonAlpha = 1f
-    }
-
-    val alpha by animateFloatAsState(
-        targetValue   = if (step == FlowStep.ACTIVATION || step == FlowStep.MAGIC) 1f else 0f,
-        animationSpec = tween(800),
-        label         = "activationAlpha"
-    )
-
-    if (alpha > 0f) {
-        Box(
+        // Matched layout structure to IntroScreen — fillMaxSize Column, vertically centred
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .fillMaxSize()
-                .alpha(alpha)
-                .background(Color(0xFF361F30))
+                .padding(horizontal = 16.dp)
+                .padding(vertical = 24.dp)
         ) {
-            VideoPlayer(
-                assetPath = "images/Background_animated.webm",
-                modifier  = Modifier.fillMaxSize(),
-                loop      = true,
-                speed     = 1f
-            )
-
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(y = (-40).dp)
-                    .padding(horizontal = 16.dp)
-            ) {
-                // Mascot — talk GIF once, then static
-                if (showStaticMascot) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data("file:///android_asset/images/Mascot_complete.png")
-                            .build(),
-                        contentDescription = "Mascot",
-                        modifier           = Modifier.size(240.dp)
-                    )
-                } else {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data("file:///android_asset/images/Mascot_talk.gif")
-                            .build(),
-                        imageLoader        = gifLoader,
-                        contentDescription = "Mascot talking",
-                        modifier           = Modifier.size(240.dp)
-                    )
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                // Full text — all reveals before button appears
-                Text(
-                    text  = fullText.take(visibleChars),
-                    style = TextStyle(
-                        fontFamily = PacificoFamily,
-                        fontSize   = 26.sp,
-                        color      = Color.White,
-                        textAlign  = TextAlign.Center,
-                        lineHeight = 36.sp,
-                        shadow     = Shadow(
-                            color      = Color(0xFFE526AB),
-                            offset     = Offset(0f, 4f),
-                            blurRadius = 12f
-                        )
-                    )
+            // Mascot — talk once then static
+            if (showStaticMascot) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data("file:///android_asset/images/Mascot_complete.png")
+                        .build(),
+                    contentDescription = "Mascot",
+                    modifier           = Modifier.size(260.dp)
                 )
-
-                Spacer(Modifier.height(28.dp))
-
-                // Let's Create — full width, twice the size, press effect
-                // Only appears after ALL text is done
-                PressableImageButton(
-                    assetPath = "images/Button_lets_create.png",
-                    onClick   = onReady,
-                    modifier  = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(3.0f)
-                        .alpha(buttonAlphaAnim)
+            } else {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data("file:///android_asset/images/Mascot_talk.gif")
+                        .build(),
+                    imageLoader        = gifLoader,
+                    contentDescription = "Mascot talking",
+                    modifier           = Modifier.size(260.dp)
                 )
             }
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                text  = fullText.take(visibleChars),
+                style = TextStyle(
+                    fontFamily = PacificoFamily,
+                    fontSize   = 26.sp,
+                    color      = Color.White,
+                    textAlign  = TextAlign.Center,
+                    lineHeight = 36.sp,
+                    shadow     = Shadow(
+                        color      = Color(0xFFE526AB),
+                        offset     = Offset(0f, 4f),
+                        blurRadius = 12f
+                    )
+                )
+            )
+
+            Spacer(Modifier.height(28.dp))
+
+            PressableImageButton(
+                assetPath = "images/Button_lets_create.png",
+                onClick   = onReady,
+                modifier  = Modifier
+                    .fillMaxWidth(0.95f)
+                    .height(130.dp)
+                    .alpha(buttonAlphaAnim)
+            )
         }
     }
 }
