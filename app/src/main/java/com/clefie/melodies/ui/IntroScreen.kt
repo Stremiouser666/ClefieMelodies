@@ -135,8 +135,7 @@ fun IntroScreen(
         modifier = Modifier
             .fillMaxSize()
             .alpha(screenAlpha)
-            .background(Color(0xFF361F30)),
-        contentAlignment = Alignment.Center
+            .background(Color(0xFF361F30))
     ) {
         VideoPlayer(
             assetPath = "images/Background_animated.webm",
@@ -147,54 +146,62 @@ fun IntroScreen(
 
         Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
 
+        // Fixed layout — top content + spacer + pinned button
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .padding(vertical = 24.dp)
+                .padding(top = 32.dp, bottom = 32.dp)
         ) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data("file:///android_asset/images/Logo_animated.gif")
-                    .build(),
-                imageLoader        = gifLoader,
-                contentDescription = "Clefie Logo",
-                modifier           = Modifier.fillMaxWidth(0.9f).aspectRatio(2.2f)
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data("file:///android_asset/images/Mascot_wave.gif")
-                    .build(),
-                imageLoader        = gifLoader,
-                contentDescription = "Mascot waving",
-                modifier           = Modifier.size(200.dp)
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            Text(
-                text  = fullText.take(visibleChars),
-                style = TextStyle(
-                    fontFamily = PacificoFamily,
-                    fontSize   = 26.sp,
-                    color      = Color.White,
-                    textAlign  = TextAlign.Center,
-                    lineHeight = 38.sp,
-                    shadow     = Shadow(
-                        color      = Color(0xFFE526AB),
-                        offset     = Offset(0f, 4f),
-                        blurRadius = 12f
-                    )
+            // Top section — logo + mascot + text
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data("file:///android_asset/images/Logo_animated.gif")
+                        .build(),
+                    imageLoader        = gifLoader,
+                    contentDescription = "Clefie Logo",
+                    modifier           = Modifier.fillMaxWidth(0.9f).aspectRatio(2.2f)
                 )
-            )
 
-            Spacer(Modifier.height(24.dp))
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data("file:///android_asset/images/Mascot_wave.gif")
+                        .build(),
+                    imageLoader        = gifLoader,
+                    contentDescription = "Mascot waving",
+                    modifier           = Modifier.size(200.dp)
+                )
 
+                // Fixed height text box — won't shift anything when text reveals
+                Box(
+                    modifier        = Modifier.fillMaxWidth().height(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text  = fullText.take(visibleChars),
+                        style = TextStyle(
+                            fontFamily = PacificoFamily,
+                            fontSize   = 26.sp,
+                            color      = Color.White,
+                            textAlign  = TextAlign.Center,
+                            lineHeight = 38.sp,
+                            shadow     = Shadow(
+                                color      = Color(0xFFE526AB),
+                                offset     = Offset(0f, 4f),
+                                blurRadius = 12f
+                            )
+                        )
+                    )
+                }
+            }
+
+            // Button pinned to bottom — always same size, never shrinks
             PressableImageButton(
                 assetPath = "images/Button_create_my_sound.png",
                 onClick   = onCreateSound,
@@ -221,19 +228,21 @@ fun ActivationScreen(
     var buttonAlpha      by remember { mutableStateOf(0f) }
     var showStaticMascot by remember { mutableStateOf(false) }
 
-    // remembered flag — guarantees LaunchedEffect only ever runs once
-    // even if the composable recomposes
     val started = remember { mutableStateOf(false) }
+
+    val buttonAlphaAnim by animateFloatAsState(
+        targetValue   = buttonAlpha,
+        animationSpec = tween(800),
+        label         = "readyButtonAlpha"
+    )
 
     LaunchedEffect(Unit) {
         if (started.value) return@LaunchedEffect
-        started.value = true
-
+        started.value   = true
         showStaticMascot = false
         visibleChars     = 0
         buttonAlpha      = 0f
 
-        // Swap mascot to static after talk GIF plays once (~6.2s)
         launch {
             delay(6200)
             showStaticMascot = true
@@ -254,12 +263,6 @@ fun ActivationScreen(
         label         = "activationAlpha"
     )
 
-    val buttonAlphaAnim by animateFloatAsState(
-        targetValue   = buttonAlpha,
-        animationSpec = tween(800),
-        label         = "readyButtonAlpha"
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -275,63 +278,75 @@ fun ActivationScreen(
 
         Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
 
-        // Matched layout structure to IntroScreen — fillMaxSize Column, vertically centred
+        // Fixed 3-zone layout — mascot top, text middle fixed height, button bottom
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .padding(vertical = 24.dp)
+                .padding(top = 32.dp, bottom = 32.dp)
         ) {
-            // Mascot — talk once then static
-            if (showStaticMascot) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data("file:///android_asset/images/Mascot_complete.png")
-                        .build(),
-                    contentDescription = "Mascot",
-                    modifier           = Modifier.size(260.dp)
-                )
-            } else {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data("file:///android_asset/images/Mascot_talk.gif")
-                        .build(),
-                    imageLoader        = gifLoader,
-                    contentDescription = "Mascot talking",
-                    modifier           = Modifier.size(260.dp)
+            // Zone 1 — Mascot (fixed position, takes up top portion)
+            Box(
+                modifier        = Modifier.fillMaxWidth().weight(0.5f),
+                contentAlignment = Alignment.Center
+            ) {
+                if (showStaticMascot) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data("file:///android_asset/images/Mascot_complete.png")
+                            .build(),
+                        contentDescription = "Mascot",
+                        modifier           = Modifier.size(260.dp)
+                    )
+                } else {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data("file:///android_asset/images/Mascot_talk.gif")
+                            .build(),
+                        imageLoader        = gifLoader,
+                        contentDescription = "Mascot talking",
+                        modifier           = Modifier.size(260.dp)
+                    )
+                }
+            }
+
+            // Zone 2 — Text (fixed height — never shifts mascot or button)
+            Box(
+                modifier        = Modifier.fillMaxWidth().weight(0.35f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text  = fullText.take(visibleChars),
+                    style = TextStyle(
+                        fontFamily = PacificoFamily,
+                        fontSize   = 26.sp,
+                        color      = Color.White,
+                        textAlign  = TextAlign.Center,
+                        lineHeight = 36.sp,
+                        shadow     = Shadow(
+                            color      = Color(0xFFE526AB),
+                            offset     = Offset(0f, 4f),
+                            blurRadius = 12f
+                        )
+                    )
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
-
-            Text(
-                text  = fullText.take(visibleChars),
-                style = TextStyle(
-                    fontFamily = PacificoFamily,
-                    fontSize   = 26.sp,
-                    color      = Color.White,
-                    textAlign  = TextAlign.Center,
-                    lineHeight = 36.sp,
-                    shadow     = Shadow(
-                        color      = Color(0xFFE526AB),
-                        offset     = Offset(0f, 4f),
-                        blurRadius = 12f
-                    )
+            // Zone 3 — Button (fixed at bottom, always same position)
+            Box(
+                modifier        = Modifier.fillMaxWidth().weight(0.15f),
+                contentAlignment = Alignment.Center
+            ) {
+                PressableImageButton(
+                    assetPath = "images/Button_lets_create.png",
+                    onClick   = onReady,
+                    modifier  = Modifier
+                        .fillMaxWidth(0.95f)
+                        .height(130.dp)
+                        .alpha(buttonAlphaAnim)
                 )
-            )
-
-            Spacer(Modifier.height(28.dp))
-
-            PressableImageButton(
-                assetPath = "images/Button_lets_create.png",
-                onClick   = onReady,
-                modifier  = Modifier
-                    .fillMaxWidth(0.95f)
-                    .height(130.dp)
-                    .alpha(buttonAlphaAnim)
-            )
+            }
         }
     }
 }
