@@ -146,18 +146,17 @@ fun IntroScreen(
 
         Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
 
-        // Fixed layout — top content + spacer + pinned button
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .padding(top = 32.dp, bottom = 32.dp)
+                .padding(top = 16.dp, bottom = 48.dp)  // less top, more bottom = content up, button down
         ) {
-            // Top section — logo + mascot + text
+            // Top content — logo + mascot + text
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 AsyncImage(
@@ -178,9 +177,9 @@ fun IntroScreen(
                     modifier           = Modifier.size(200.dp)
                 )
 
-                // Fixed height text box — won't shift anything when text reveals
+                // Taller fixed text box — fits full 2-line text
                 Box(
-                    modifier        = Modifier.fillMaxWidth().height(120.dp),
+                    modifier         = Modifier.fillMaxWidth().height(160.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -201,7 +200,7 @@ fun IntroScreen(
                 }
             }
 
-            // Button pinned to bottom — always same size, never shrinks
+            // Button pinned to bottom
             PressableImageButton(
                 assetPath = "images/Button_create_my_sound.png",
                 onClick   = onCreateSound,
@@ -227,8 +226,7 @@ fun ActivationScreen(
     var visibleChars     by remember { mutableStateOf(0) }
     var buttonAlpha      by remember { mutableStateOf(0f) }
     var showStaticMascot by remember { mutableStateOf(false) }
-
-    val started = remember { mutableStateOf(false) }
+    val started          = remember { mutableStateOf(false) }
 
     val buttonAlphaAnim by animateFloatAsState(
         targetValue   = buttonAlpha,
@@ -238,7 +236,7 @@ fun ActivationScreen(
 
     LaunchedEffect(Unit) {
         if (started.value) return@LaunchedEffect
-        started.value   = true
+        started.value    = true
         showStaticMascot = false
         visibleChars     = 0
         buttonAlpha      = 0f
@@ -278,17 +276,16 @@ fun ActivationScreen(
 
         Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
 
-        // Fixed 3-zone layout — mascot top, text middle fixed height, button bottom
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .padding(top = 32.dp, bottom = 32.dp)
+                .padding(top = 16.dp, bottom = 48.dp)
         ) {
-            // Zone 1 — Mascot (fixed position, takes up top portion)
+            // Zone 1 — Mascot (0.45 of space)
             Box(
-                modifier        = Modifier.fillMaxWidth().weight(0.5f),
+                modifier         = Modifier.fillMaxWidth().weight(0.45f),
                 contentAlignment = Alignment.Center
             ) {
                 if (showStaticMascot) {
@@ -311,9 +308,9 @@ fun ActivationScreen(
                 }
             }
 
-            // Zone 2 — Text (fixed height — never shifts mascot or button)
+            // Zone 2 — Text (0.33 of space)
             Box(
-                modifier        = Modifier.fillMaxWidth().weight(0.35f),
+                modifier         = Modifier.fillMaxWidth().weight(0.33f),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -333,9 +330,9 @@ fun ActivationScreen(
                 )
             }
 
-            // Zone 3 — Button (fixed at bottom, always same position)
+            // Zone 3 — Button (0.22 of space — enough for 130dp)
             Box(
-                modifier        = Modifier.fillMaxWidth().weight(0.15f),
+                modifier         = Modifier.fillMaxWidth().weight(0.22f),
                 contentAlignment = Alignment.Center
             ) {
                 PressableImageButton(
