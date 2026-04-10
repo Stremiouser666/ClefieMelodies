@@ -146,18 +146,18 @@ fun IntroScreen(
 
         Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
 
+        // Weight-based layout — scales to all DPI automatically
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .padding(top = 16.dp, bottom = 48.dp)  // less top, more bottom = content up, button down
+                .padding(top = 16.dp, bottom = 24.dp)
         ) {
-            // Top content — logo + mascot + text
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
+            // Zone 1 — Logo
+            Box(
+                modifier         = Modifier.fillMaxWidth().weight(0.28f),
+                contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
@@ -165,50 +165,62 @@ fun IntroScreen(
                         .build(),
                     imageLoader        = gifLoader,
                     contentDescription = "Clefie Logo",
-                    modifier           = Modifier.fillMaxWidth(0.9f).aspectRatio(2.2f)
+                    modifier           = Modifier.fillMaxWidth(0.92f).aspectRatio(2.2f)
                 )
+            }
 
+            // Zone 2 — Mascot
+            Box(
+                modifier         = Modifier.fillMaxWidth().weight(0.32f),
+                contentAlignment = Alignment.Center
+            ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data("file:///android_asset/images/Mascot_wave.gif")
                         .build(),
                     imageLoader        = gifLoader,
                     contentDescription = "Mascot waving",
-                    modifier           = Modifier.size(200.dp)
+                    modifier           = Modifier.fillMaxHeight(0.95f).aspectRatio(1f)
                 )
-
-                // Taller fixed text box — fits full 2-line text
-                Box(
-                    modifier         = Modifier.fillMaxWidth().height(160.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text  = fullText.take(visibleChars),
-                        style = TextStyle(
-                            fontFamily = PacificoFamily,
-                            fontSize   = 26.sp,
-                            color      = Color.White,
-                            textAlign  = TextAlign.Center,
-                            lineHeight = 38.sp,
-                            shadow     = Shadow(
-                                color      = Color(0xFFE526AB),
-                                offset     = Offset(0f, 4f),
-                                blurRadius = 12f
-                            )
-                        )
-                    )
-                }
             }
 
-            // Button pinned to bottom
-            PressableImageButton(
-                assetPath = "images/Button_create_my_sound.png",
-                onClick   = onCreateSound,
-                modifier  = Modifier
-                    .fillMaxWidth(0.95f)
-                    .height(130.dp)
-                    .alpha(buttonAlphaAnim)
-            )
+            // Zone 3 — Text (proportional — never clips on any DPI)
+            Box(
+                modifier         = Modifier.fillMaxWidth().weight(0.22f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text  = fullText.take(visibleChars),
+                    style = TextStyle(
+                        fontFamily = PacificoFamily,
+                        fontSize   = 22.sp,
+                        color      = Color.White,
+                        textAlign  = TextAlign.Center,
+                        lineHeight = 32.sp,
+                        shadow     = Shadow(
+                            color      = Color(0xFFE526AB),
+                            offset     = Offset(0f, 4f),
+                            blurRadius = 12f
+                        )
+                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+            }
+
+            // Zone 4 — Button
+            Box(
+                modifier         = Modifier.fillMaxWidth().weight(0.18f),
+                contentAlignment = Alignment.Center
+            ) {
+                PressableImageButton(
+                    assetPath = "images/Button_create_my_sound.png",
+                    onClick   = onCreateSound,
+                    modifier  = Modifier
+                        .fillMaxWidth(0.95f)
+                        .fillMaxHeight(0.9f)
+                        .alpha(buttonAlphaAnim)
+                )
+            }
         }
     }
 }
@@ -281,9 +293,9 @@ fun ActivationScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .padding(top = 16.dp, bottom = 48.dp)
+                .padding(top = 16.dp, bottom = 24.dp)
         ) {
-            // Zone 1 — Mascot (0.45 of space)
+            // Zone 1 — Mascot
             Box(
                 modifier         = Modifier.fillMaxWidth().weight(0.45f),
                 contentAlignment = Alignment.Center
@@ -294,7 +306,7 @@ fun ActivationScreen(
                             .data("file:///android_asset/images/Mascot_complete.png")
                             .build(),
                         contentDescription = "Mascot",
-                        modifier           = Modifier.size(260.dp)
+                        modifier           = Modifier.fillMaxHeight(0.95f).aspectRatio(1f)
                     )
                 } else {
                     AsyncImage(
@@ -303,12 +315,12 @@ fun ActivationScreen(
                             .build(),
                         imageLoader        = gifLoader,
                         contentDescription = "Mascot talking",
-                        modifier           = Modifier.size(260.dp)
+                        modifier           = Modifier.fillMaxHeight(0.95f).aspectRatio(1f)
                     )
                 }
             }
 
-            // Zone 2 — Text (0.33 of space)
+            // Zone 2 — Text
             Box(
                 modifier         = Modifier.fillMaxWidth().weight(0.33f),
                 contentAlignment = Alignment.Center
@@ -317,20 +329,21 @@ fun ActivationScreen(
                     text  = fullText.take(visibleChars),
                     style = TextStyle(
                         fontFamily = PacificoFamily,
-                        fontSize   = 26.sp,
+                        fontSize   = 22.sp,
                         color      = Color.White,
                         textAlign  = TextAlign.Center,
-                        lineHeight = 36.sp,
+                        lineHeight = 32.sp,
                         shadow     = Shadow(
                             color      = Color(0xFFE526AB),
                             offset     = Offset(0f, 4f),
                             blurRadius = 12f
                         )
-                    )
+                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
 
-            // Zone 3 — Button (0.22 of space — enough for 130dp)
+            // Zone 3 — Button
             Box(
                 modifier         = Modifier.fillMaxWidth().weight(0.22f),
                 contentAlignment = Alignment.Center
@@ -340,7 +353,7 @@ fun ActivationScreen(
                     onClick   = onReady,
                     modifier  = Modifier
                         .fillMaxWidth(0.95f)
-                        .height(130.dp)
+                        .fillMaxHeight(0.9f)
                         .alpha(buttonAlphaAnim)
                 )
             }
