@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Redirect Blocker Hardened Full
+// @name         Redirect Blocker Hardened Full (Strict)
 // @namespace    via-browser
-// @version      1.4
-// @description  Hardened redirect blocker: document.write/open sanitization, overlay neutralizer, strict validation, history/anchor/form interception, meta refresh removal, per-site whitelist UI.
+// @version      2.0
+// @description  Strict redirect blocker: blocks ALL navigation attempts (including same-site link clicks/form submits) unless explicitly allowed via the on-screen prompt, or the target host is on your permanent whitelist. document.write/open sanitization, overlay neutralizer, meta refresh removal, history/anchor/form interception.
 // @author       You
 // @match        *://*/*
 // @grant        none
@@ -15,10 +15,10 @@
   // ---------- Config ----------
   const WHITELIST_KEY = 'rb_whitelist_v2';
   const LOG_KEY = WHITELIST_KEY + '_log';
-  const GESTURE_WINDOW_MS = 1000;
   const OVERLAY_ATTR = 'data-rb-overlay';
   const MIN_COVER_RATIO = 0.6;
   const SCAN_INTERVAL = 300;
+  const GESTURE_WINDOW_MS = 1000; // still used for overlay-click heuristics only, NOT for navigation allowance
 
   // ---------- Utilities ----------
   function now() { return Date.now(); }
@@ -28,7 +28,7 @@
     try { const u = new URL('http://' + h); return canonicalHost(u.hostname); } catch { return ''; }
   }
 
-  // ---------- Whitelist ----------
+  // ---------- Whitelist (this is now the ONLY way a navigation is auto-allowed) ----------
   function loadWhitelist() {
     const raw = localStorage.getItem(WHITELIST_KEY);
     const arr = safeParseJSON(raw, []);
@@ -60,16 +60,18 @@
     const allowed = ['https:', 'http:', 'intent:', 'mailto:', 'tel:', 'blob:', 'data:', 'javascript:'];
     return allowed.includes(protocol);
   }
-  function isAllowedNavigation(urlObj, opts = { allowSameHost: true }) {
-    if (!urlObj) return true;
-    if (urlObj.protocol === 'intent:') return true;
+
+  // STRICT MODE: the only automatic pass is the permanent whitelist.
+  // Same-host navigation, trusted user gestures, and intent: links are NO LONGER
+  // auto-allowed — every one of them now surfaces the Allow/Allow-once/Dismiss prompt.
+  function isAllowedNavigation(urlObj) {
+    if (!urlObj) return true; // couldn't parse a URL at all — nothing to block
     if (!isSchemeAllowed(urlObj.protocol)) return false;
-    if (opts.allowSameHost && canonicalHost(urlObj.hostname) === canonicalHost(location.hostname)) return true;
     if (isWhitelistedHost(urlObj.hostname)) return true;
     return false;
   }
 
-  // ---------- Trusted gesture tracking ----------
+  // ---------- Trusted gesture tracking (kept only for the overlay-click heuristic below) ----------
   let lastTrustedGesture = 0;
   function markTrustedGesture(e) { if (e && e.isTrusted) lastTrustedGesture = now(); }
   function hadRecentTrustedGesture() { return (now() - lastTrustedGesture) <= GESTURE_WINDOW_MS; }
@@ -169,15 +171,12 @@
       function sanitizeHtml(html) {
         try {
           if (!html || typeof html !== 'string') return html;
-          // Neutralize meta refresh by setting a very long delay and remove inline location assignments
           html = html.replace(/(<meta[^>]*http-equiv\s*=\s*["']?refresh[^>]*content\s*=\s*["']?)([^"'>]*)(["']?[^>]*>)/ig,
             (m, p1, content, p3) => {
-              // keep url but set long delay
               const urlMatch = content.match(/url=(.*)$/i);
               const urlPart = urlMatch ? urlMatch[1] : '';
               return p1 + '99999; url=' + urlPart + p3;
             });
-          // Remove or neutralize inline location assignments
           html = html.replace(/(top|window|location)\s*\.\s*(href|replace|assign)\s*=\s*([^;<>]+)/ig, '/*blocked-location*/');
           html = html.replace(/window\.open\s*\(/ig, '/*blocked-window-open*/(');
         } catch (e) {}
@@ -208,6 +207,10 @@
   })();
 
   // ---------- Overlay detector and neutralizer ----------
+  // NOTE: this heuristic (trusted-gesture-based) is about fake full-screen overlay
+  // click-hijacking, not about navigation allowance, so it's left as-is. Any
+  // navigation the overlay's underlying click ultimately triggers still goes
+  // through the strict anchor/form/JS-API checks below.
   (function overlayProtector() {
     try {
       function isLargeOverlay(el) {
@@ -368,6 +371,9 @@
   })();
 
   // ---------- Patch navigation APIs ----------
+  // NOTE: the previous "if (location.hostname.includes('bstsrs')) return orig...call(...)"
+  // bypass has been removed everywhere below. There is no per-host escape hatch other
+  // than the visible, user-controlled whitelist.
   (function patchLocationAndOpen() {
     function patchWindow(win) {
       if (!win || !win.Location) return;
@@ -376,14 +382,12 @@
         win.__rb_patched = true;
       } catch (e) { return; }
 
-      // Direct assignment handler (e.g., location.href = 'url')
       try {
         const desc = Object.getOwnPropertyDescriptor(win.Location.prototype, 'href');
         if (desc && desc.set) {
           const origSetHref = desc.set;
           Object.defineProperty(win.Location.prototype, 'href', {
             set: function (url) {
-              if (location.hostname.includes('bstsrs')) return origSetHref.call(this, url);
               const u = resolveUrlObj(url);
               if (!isAllowedNavigation(u)) {
                 handleBlocked(u ? u.href : String(url), 'location.href');
@@ -400,7 +404,6 @@
         const origAssign = win.Location.prototype.assign;
         if (origAssign) {
           win.Location.prototype.assign = function (url) {
-            if (location.hostname.includes('bstsrs')) return origAssign.call(this, url);
             const u = resolveUrlObj(url);
             if (!isAllowedNavigation(u)) {
               handleBlocked(u ? u.href : String(url), 'location.assign');
@@ -415,7 +418,6 @@
         const origReplace = win.Location.prototype.replace;
         if (origReplace) {
           win.Location.prototype.replace = function (url) {
-            if (location.hostname.includes('bstsrs')) return origReplace.call(this, url);
             const u = resolveUrlObj(url);
             if (!isAllowedNavigation(u)) {
               handleBlocked(u ? u.href : String(url), 'location.replace');
@@ -430,7 +432,6 @@
         const origOpen = win.open;
         if (origOpen) {
           win.open = function (url, target, features) {
-            if (location.hostname.includes('bstsrs')) return origOpen.call(this, url, target, features);
             const u = resolveUrlObj(url || '');
             if (url && !isAllowedNavigation(u)) {
               handleBlocked(u ? u.href : String(url), 'window.open');
@@ -470,7 +471,6 @@
       const origPush = history.pushState;
       const origReplace = history.replaceState;
       history.pushState = function (state, title, url) {
-        if (location.hostname.includes('bstsrs')) return origPush.apply(history, arguments);
         if (typeof url === 'string' && url.length) {
           const u = resolveUrlObj(url);
           if (!isAllowedNavigation(u)) {
@@ -481,7 +481,6 @@
         return origPush.apply(history, arguments);
       };
       history.replaceState = function (state, title, url) {
-        if (location.hostname.includes('bstsrs')) return origReplace.apply(history, arguments);
         if (typeof url === 'string' && url.length) {
           const u = resolveUrlObj(url);
           if (!isAllowedNavigation(u)) {
@@ -499,7 +498,6 @@
     try {
       const origSubmit = HTMLFormElement.prototype.submit;
       HTMLFormElement.prototype.submit = function () {
-        if (location.hostname.includes('bstsrs')) return origSubmit.apply(this, arguments);
         const action = this.getAttribute('action') || location.href;
         const u = resolveUrlObj(action);
         if (!isAllowedNavigation(u)) {
@@ -512,6 +510,9 @@
   })();
 
   // ---------- Anchor click and form submit interception ----------
+  // STRICT: no more "recent trusted gesture" bypass — every anchor click and form
+  // submit is checked against isAllowedNavigation, and blocked (prompting the user)
+  // unless the host is on the permanent whitelist.
   function onAnchorClick(e) {
     try {
       if (e.defaultPrevented) return;
@@ -522,7 +523,6 @@
       if (!a || !a.href) return;
       const u = resolveUrlObj(a.getAttribute('href'));
       if (!isAllowedNavigation(u)) {
-        if (e.isTrusted && hadRecentTrustedGesture()) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         handleBlocked(u ? u.href : a.href, 'anchor.click');
@@ -537,7 +537,6 @@
       const action = form.getAttribute('action') || location.href;
       const u = resolveUrlObj(action);
       if (!isAllowedNavigation(u)) {
-        if (e.isTrusted && hadRecentTrustedGesture()) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         handleBlocked(u ? u.href : action, 'form.submit');
@@ -548,6 +547,6 @@
   window.addEventListener('submit', onFormSubmit, true);
 
   // ---------- Defensive notes ----------
-  pushLog({ type: 'init', host: location.hostname });
+  pushLog({ type: 'init', host: location.hostname, mode: 'strict' });
 
 })();
